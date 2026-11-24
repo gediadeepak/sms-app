@@ -6,19 +6,45 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.gediadeepak.smsapp.core.*
 
-data class ThreadMetadata(val starred: Boolean = false, val archived: Boolean = false, val alias: String = "")
+data class ThreadMetadata(val starred: Boolean = false, val archived: Boolean = false, val alias: String = "", val spam: Boolean = false)
 data class PendingSms(val key: String, val address: String, val text: String, val timestamp: Long, val subscriptionId: Int?)
 
 /** App metadata only: Android's SMS provider remains the source of truth for messages. */
-class SandeshDatabase private constructor(context: Context) : SQLiteOpenHelper(context, "sandesh.db", null, 2) {
+class SandeshDatabase private constructor(context: Context) : SQLiteOpenHelper(context, "sandesh.db", null, 3) {
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE thread_metadata (thread_id TEXT PRIMARY KEY, starred INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0, alias TEXT NOT NULL DEFAULT '')")
+        db.execSQL("CREATE TABLE thread_metadata (thread_id TEXT PRIMARY KEY, starred INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0, alias TEXT NOT NULL DEFAULT '', spam INTEGER NOT NULL DEFAULT 0)")
         db.execSQL("CREATE TABLE send_parts (sms_id TEXT NOT NULL, part INTEGER NOT NULL, sent INTEGER NOT NULL DEFAULT 0, delivered INTEGER NOT NULL DEFAULT 0, error INTEGER, PRIMARY KEY(sms_id, part))")
         db.execSQL("CREATE TABLE pending_mms (id INTEGER PRIMARY KEY AUTOINCREMENT, received_at INTEGER NOT NULL, subscription_id INTEGER, pdu BLOB NOT NULL)")
         createPendingTable(db)
+        createBlockedTable(db)
     }
     private fun createPendingTable(db: SQLiteDatabase) { db.execSQL("CREATE TABLE IF NOT EXISTS pending_sms (receipt_key TEXT PRIMARY KEY, address TEXT NOT NULL, body TEXT NOT NULL, stamp INTEGER NOT NULL, subscription_id INTEGER)") }
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { if (oldVersion < 2) createPendingTable(db) }
+    private fun createBlockedTable(db: SQLiteDatabase) { db.execSQL("CREATE TABLE IF NOT EXISTS blocked_senders (sender_key TEXT PRIMARY KEY, address TEXT NOT NULL, added_at INTEGER NOT NULL)") }
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) createPendingTable(db)
+        if (oldVersion < 3) { db.execSQL("ALTER TABLE thread_metadata ADD COLUMN spam INTEGER NOT NULL DEFAULT 0"); createBlockedTable(db) }
+    }
+    fun blockedSenders(): Map<String, String> = buildMap {
+        readableDatabase.query("blocked_senders", arrayOf("sender_key", "address"), null, null, null, null, "added_at DESC").use { c -> while (c.moveToNext()) put(c.getString(0), c.getString(1)) }
+    }
+    fun isSenderBlocked(address: String): Boolean = readableDatabase.query("blocked_senders", arrayOf("sender_key"), "sender_key=?", arrayOf(spamSenderKey(address)), null, null, null).use { it.moveToFirst() }
+    @Synchronized fun setSenderBlocked(address: String, blocked: Boolean) {
+        require(address.trim().isNotEmpty() && address.length <= 512) { "Invalid sender." }
+        val key = spamSenderKey(address)
+        if (blocked) writableDatabase.insertWithOnConflict("blocked_senders", null, ContentValues().apply {
+            put("sender_key", key); put("address", address.trim()); put("added_at", System.currentTimeMillis())
+        }, SQLiteDatabase.CONFLICT_IGNORE)
+        else writableDatabase.delete("blocked_senders", "sender_key=?", arrayOf(key))
+    }
+    @Synchronized fun changeBlockedSender(address: String, blocked: Boolean, threadIds: List<String>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            setSenderBlocked(address, blocked)
+            threadIds.forEach { id -> updateMetadata(id) { it.copy(spam = false, archived = false) } }
+            db.setTransactionSuccessful()
+        } finally { db.endTransaction() }
+    }
     fun retainIncoming(sms: PendingSms) { writableDatabase.insertWithOnConflict("pending_sms", null, ContentValues().apply {
         put("receipt_key", sms.key); put("address", sms.address); put("body", sms.text); put("stamp", sms.timestamp); put("subscription_id", sms.subscriptionId)
     }, SQLiteDatabase.CONFLICT_IGNORE) }
@@ -28,13 +54,19 @@ class SandeshDatabase private constructor(context: Context) : SQLiteOpenHelper(c
     fun acknowledgeIncoming(key: String) { writableDatabase.delete("pending_sms", "receipt_key=?", arrayOf(key)) }
     fun metadata(): Map<String, ThreadMetadata> = buildMap {
         readableDatabase.query("thread_metadata", null, null, null, null, null, null).use { c ->
-            while (c.moveToNext()) put(c.getString(0), ThreadMetadata(c.getInt(1) != 0, c.getInt(2) != 0, c.getString(3)))
+            while (c.moveToNext()) put(c.getString(0), ThreadMetadata(c.getInt(1) != 0, c.getInt(2) != 0, c.getString(3), c.getInt(4) != 0))
+        }
+    }
+    fun threadMetadata(id: String?): ThreadMetadata? {
+        if (id == null) return null
+        return readableDatabase.query("thread_metadata", arrayOf("starred", "archived", "alias", "spam"), "thread_id=?", arrayOf(id), null, null, null).use { c ->
+            if (c.moveToFirst()) ThreadMetadata(c.getInt(0) != 0, c.getInt(1) != 0, c.getString(2), c.getInt(3) != 0) else null
         }
     }
     @Synchronized fun updateMetadata(id: String, transform: (ThreadMetadata) -> ThreadMetadata) {
-        val changed = transform(metadata()[id] ?: ThreadMetadata())
+        val changed = transform(threadMetadata(id) ?: ThreadMetadata())
         writableDatabase.insertWithOnConflict("thread_metadata", null, ContentValues().apply {
-            put("thread_id", id); put("starred", if (changed.starred) 1 else 0); put("archived", if (changed.archived) 1 else 0); put("alias", changed.alias)
+            put("thread_id", id); put("starred", if (changed.starred) 1 else 0); put("archived", if (changed.archived) 1 else 0); put("alias", changed.alias); put("spam", if (changed.spam) 1 else 0)
         }, SQLiteDatabase.CONFLICT_REPLACE)
     }
     fun prepareParts(smsId: String, count: Int) {

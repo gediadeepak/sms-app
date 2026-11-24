@@ -1,10 +1,14 @@
-# Sandesh privacy notes (0.3.0)
+# Sandesh privacy notes (0.4.0)
 
 This documents implemented behaviour. The owner must supply a hosted policy, support contact and retention/deletion terms before publication.
 
 Sandesh reads and writes SMS after you make it the default SMS app and grant permissions. Phone-state access identifies active SIMs. Carrier SMS travels through your mobile operator to the recipient when you tap Send. Notifications use a generic message preview.
 
-SMS is held in Android's system SMS provider. Sandesh's private SQLite database stores stars, archives, aliases, send/delivery receipts, pending incoming SMS and raw unsupported MMS notifications. These records can contain message content. Preferences store appearance and sending choices. Android protects this local storage; the backup password does not encrypt the running app's database. Automatic Android app-data backup/device transfer remains excluded.
+SMS is held in Android's system SMS provider. Sandesh's private SQLite database stores stars, archives, aliases, spam flags, an app-local blocked-sender list, send/delivery receipts, pending incoming SMS and raw unsupported MMS notifications. These records can contain message content. Preferences store appearance and sending choices. Android protects this local storage; the backup password does not encrypt the running app's database. Automatic Android app-data backup/device transfer remains excluded.
+
+Spam handling is manual and local. Messages are preserved in Android's store and excluded from Sandesh's ordinary folders. Blocked/spam SMS is not announced or notified by Sandesh. Blocking does not affect calls, carrier delivery or other messaging apps. Encrypted backups include spam flags and the blocked-sender list; restoring merges those settings rather than clearing current blocks.
+
+Headset readout is optional and off by default. The user chooses the audio output. Automatic speech contains only the sender; message bodies require an explicit Read action with the phone unlocked. Sandesh selects an installed offline TTS voice and does not submit the text to a cloud AI service. The installed speech engine has its own behaviour and policy. Private, temporary synthesized audio files are deleted on completion/stop; stale files after a crash are removed on the next readout or uninstall. They are not included in backups. Audio-device identity and the announcement preference stay in local preferences and do not transfer through SMS backup. Readout uses a short-lived media-playback foreground service with a Stop notification, audio-focus and routing checks. Physical-device verification is required before release.
 
 Accounts are optional. Email/password registration, login, verification, password reset and Google sign-in use Firebase Authentication and Android Credential Manager. Firebase receives account information such as email, optional name, provider identity and authentication requests. Sandesh does not put account passwords or authentication tokens into SMS backups. Firebase and Google SDKs manage authentication sessions; passwords are not stored in Sandesh preferences. Internet access supports these optional features. No advertising, analytics or cloud AI SDK is included.
 

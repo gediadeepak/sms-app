@@ -67,3 +67,14 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 - Back up with verified account A, then restore on another phone. Anonymous clients, unverified A and verified B must be denied access to A's Firestore paths by server rules, even when bypassing the Android UI.
 - Interrupt upload and confirm the previous published backup stays usable. Interrupt download and verify no provider writes. Test expired sign-in, missing rules/database and quota errors without false success notices.
 - Verify sign-out/uninstall do not imply remote deletion. Complete account/data deletion before store distribution.
+
+## Spam and headset readout
+
+- Upgrade an existing database from version 2 to 3; stars, archives, aliases, send receipts and retained incoming SMS must survive. New spam flags start false and the block list starts empty.
+- Move a thread to Spam. Check it disappears from Inbox, Unread, Starred and Archived while remaining readable/recoverable in Spam. New SMS in that thread is stored without notifications or speech.
+- Block numeric and alphanumeric senders, restart the app, and receive fresh SMS. Messages remain in Spam. Unblock via both the conversation and Settings → Blocked senders; verify future SMS returns to normal notifications. Calls and other apps must be unaffected. Nothing is deleted or sent by block/unblock.
+- Restore an older backup without spam fields and a new backup with spam/blocks. Existing SMS remains; block lists merge, no restored message is sent/announced, and device-specific headset settings are not imported.
+- Test headset readout with wired/USB/Bluetooth outputs on Android 9+; verify it is unavailable on API 24–27. Select a private output, enable announcements and receive fresh SMS: only the sender is spoken. Body speech requires an explicit Read action and an unlocked phone.
+- Use Test headset and Stop before testing private content. Verify an installed offline voice is required. Test missing voice, focus denial, calls, DND, screen lock, background restrictions and force-stop recovery without crashes or repeated old announcements.
+- During speech disconnect the selected output, connect a speaker/car, switch routes, interrupt audio focus and press Stop. Audio must stop without exposing message content through another output. On Android 16+ verify all reported routes match the chosen device. Test process death/temporary file cleanup and unidentified output reselection.
+- Repeat the release-gating checklist in SPAM_AND_HEADSET.md before publication; no physical audio-routing results are claimed by build/unit tests.

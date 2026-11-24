@@ -1,6 +1,6 @@
 # Sandesh release preparation
 
-Version: 0.3.4 (code 7), application ID `com.sandesh.app`, minimum API 24, target API 37. Notification setup now includes a one-time Android 13+ permission prompt, app/channel status, working settings links and a local test alert. Messages are marked read automatically only when their conversation is visible in the focused foreground window. The inbox keeps its compact SIM icons and separate account/backup pages. This installs separately from the earlier `com.gediadeepak.smsapp` candidate; private settings do not migrate automatically. System SMS remains available after permission setup. Google sign-in still requires the correct signing fingerprint registered in Firebase.
+Version: 0.4.0 (code 8), application ID `com.sandesh.app`, minimum API 24, target API 37. Includes recoverable manual Spam, an app-local blocked-sender list and opt-in sender announcements/manual SMS readout through a selected headset on Android 9+. Notification diagnostics, compact SIM icons and separate account/backup pages remain available. Earlier com.gediadeepak.smsapp builds install separately; their private settings do not migrate automatically. Google sign-in requires the correct signing fingerprint registered in Firebase.
 
 ## Build and signing
 
@@ -33,6 +33,8 @@ This checks that required configuration names survive resource shrinking. Actual
 ## Publication gates still requiring completion
 
 - Execute and record the physical single-SIM and dual-SIM/eSIM tests in DEVICE_TEST_PLAN.md. Build success and pure Kotlin tests are not carrier tests.
+- Complete the spam/database-upgrade/backup tests and headset matrix in [SPAM_AND_HEADSET.md](SPAM_AND_HEADSET.md). Verify audio never becomes audible on an unselected output during disconnect, routing changes, calls and lock/unlock. If that guarantee cannot be met on a tested route/OEM, keep headset readout disabled there.
+- Review the new mediaPlayback foreground-service declaration and required store disclosures. Runtime permissions, channel controls and OEM background policies can prevent announcements; the normal SMS alert/manual Read action remain the fallback.
 - Complete [Firebase setup](FIREBASE_SETUP.md): enable providers, register signing fingerprints, create Firestore and publish reviewed private rules. The supplied JSON now includes the web OAuth client. Live account flows and rules have not been verified by the build.
 - Test encrypted file and cloud restore on actual devices, including wrong passwords, damaged files, duplicate merges, interrupted operations and account isolation.
 - Implement account/cloud-data deletion and a public deletion-request route before publishing account creation; this candidate has no deletion flow.

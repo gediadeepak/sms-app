@@ -24,6 +24,7 @@ import com.gediadeepak.smsapp.ui.SandeshSplash
 import com.gediadeepak.smsapp.telephony.SmsAccess
 import com.gediadeepak.smsapp.telephony.SmsNotifications
 import com.gediadeepak.smsapp.telephony.SmsNotificationStatus
+import com.gediadeepak.smsapp.audio.HeadsetReadout
 import com.gediadeepak.smsapp.account.AccountViewModel
 import com.gediadeepak.smsapp.ui.AccountBackupFlow
 import com.gediadeepak.smsapp.ui.AccountDestination
@@ -81,7 +82,7 @@ class MainActivity : ComponentActivity() {
                 Box(Modifier.fillMaxSize()) {
                     SandeshApp(model, ::setupSms, ::openAppSettings, ::requestNotifications,
                         onAccount = { accountDestination = AccountDestination.ACCOUNT }, onBackup = { accountDestination = AccountDestination.BACKUP },
-                        onTestNotifications = ::testNotifications)
+                        onTestNotifications = ::testNotifications, onReadMessage = ::readMessage)
                     accountDestination?.let { start -> AccountBackupFlow(account, start, state.ready,
                         onPickRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onDismiss = { accountDestination = null }) }
                     if (showSplash) SandeshSplash { showSplash = false }
@@ -115,6 +116,9 @@ class MainActivity : ComponentActivity() {
         if (SmsNotifications.status(this) != SmsNotificationStatus.ENABLED) { requestNotifications(); return }
         if (SmsNotifications.test(this)) Toast.makeText(this, "Test alert requested. Swipe down to check your notification panel.", Toast.LENGTH_LONG).show()
         else model.reportError("Android blocked the test notification. Check Sandesh’s notification settings.")
+    }
+    private fun readMessage(id: String) {
+        if (!HeadsetReadout.start(this, id, true)) model.reportError(HeadsetReadout.problem(this) ?: "Unable to start headset readout. Try again while Sandesh is open.")
     }
     private fun openAppSettings() { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
 }

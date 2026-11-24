@@ -7,6 +7,7 @@ import android.provider.Telephony
 import com.gediadeepak.smsapp.core.*
 import com.gediadeepak.smsapp.data.SandeshDatabase
 import com.gediadeepak.smsapp.data.PendingSms
+import com.gediadeepak.smsapp.audio.HeadsetReadout
 
 class DeviceSmsRepository(private val context: Context) {
     private val resolver get() = context.contentResolver
@@ -15,6 +16,7 @@ class DeviceSmsRepository(private val context: Context) {
     fun load(subscriptions: List<DeviceSim>): List<Conversation> {
         check(SmsAccess.ready(context)) { "Make Sandesh your default SMS app and allow the required permissions." }
         val meta = database.metadata()
+        val blockedSenders = database.blockedSenders()
         val deliveries = database.allDeliveries()
         val groups = linkedMapOf<String, MutableList<Message>>()
         val addresses = mutableMapOf<String, String>()
@@ -46,7 +48,8 @@ class DeviceSmsRepository(private val context: Context) {
             val metadata = meta[thread]
             Conversation(thread, metadata?.alias?.takeIf { it.isNotBlank() } ?: addresses.getValue(thread), addresses.getValue(thread),
                 messages.last().line, messages, unread[thread] ?: 0, metadata?.starred ?: false, metadata?.archived ?: false,
-                subscriptionId = messages.last().subscriptionId)
+                subscriptionId = messages.last().subscriptionId, spam = metadata?.spam == true,
+                blocked = spamSenderKey(addresses.getValue(thread)) in blockedSenders)
         }.sortedByDescending { it.messages.last().timestamp }
     }
     fun threadId(number: String): String {
@@ -73,10 +76,10 @@ class DeviceSmsRepository(private val context: Context) {
         val key = java.security.MessageDigest.getInstance("SHA-256").digest(rawKey.toByteArray()).joinToString("") { "%02x".format(it) }
         database.retainIncoming(PendingSms(key, number, text, stamp, subscriptionId))
         if (!SmsAccess.ready(context)) SmsNotifications.failure(context, "An incoming SMS is saved locally. Restore SMS and SIM permissions to show it in your inbox.")
-        drainPendingIncoming()
+        drainPendingIncoming(announceKey = key)
         return if (SmsAccess.ready(context)) threadId(number) else null
     }
-    fun drainPendingIncoming() = synchronized(incomingLock) {
+    fun drainPendingIncoming(announceKey: String? = null): Unit = synchronized(incomingLock) {
         if (!SmsAccess.ready(context)) return
         database.pendingIncoming().forEach { receipt ->
         val number = receipt.address
@@ -88,13 +91,18 @@ class DeviceSmsRepository(private val context: Context) {
         val exists = resolver.query(Telephony.Sms.Inbox.CONTENT_URI, arrayOf("_id"),
             "address=? AND date=? AND body=? AND sub_id=?", arrayOf(number, stamp.toString(), text, (subscriptionId ?: -1).toString()), null)?.use { it.moveToFirst() } ?: false
         if (!exists) {
-            resolver.insert(Telephony.Sms.Inbox.CONTENT_URI, ContentValues().apply {
+            val saved = resolver.insert(Telephony.Sms.Inbox.CONTENT_URI, ContentValues().apply {
                 put("address", number); put("body", text); put("date", stamp); put("date_sent", stamp)
                 put("thread_id", thread.toLong()); put("read", 0); put("seen", 0)
                 put("type", Telephony.Sms.MESSAGE_TYPE_INBOX); put("sub_id", subscriptionId ?: -1)
             }) ?: error("Unable to save the received SMS.")
+            val unwanted = database.isSenderBlocked(number) || database.threadMetadata(thread)?.spam == true
             database.updateMetadata(thread) { it.copy(archived = false) }
-            SmsNotifications.incoming(context, thread, number)
+            if (unwanted) SmsNotifications.cancel(context, thread) else {
+                val id = ContentUris.parseId(saved).toString()
+                SmsNotifications.incoming(context, thread, number, id)
+                if (receipt.key == announceKey) HeadsetReadout.start(context, id, false)
+            }
         }
         database.acknowledgeIncoming(receipt.key)
         }

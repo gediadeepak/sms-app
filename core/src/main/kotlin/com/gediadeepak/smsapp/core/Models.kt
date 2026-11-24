@@ -1,7 +1,7 @@
 package com.gediadeepak.smsapp.core
 
 enum class SimLine(val defaultLabel: String, val slot: Int) { PERSONAL("Personal", 1), WORK("Work", 2), UNKNOWN("Unknown SIM", 0) }
-enum class Folder(val label: String) { INBOX("Inbox"), UNREAD("Unread"), STARRED("Starred"), ARCHIVED("Archived") }
+enum class Folder(val label: String) { INBOX("Inbox"), UNREAD("Unread"), STARRED("Starred"), ARCHIVED("Archived"), SPAM("Spam") }
 enum class Delivery { RECEIVED, SENDING, SENT, DELIVERED, FAILED, UNDELIVERED, UNKNOWN }
 enum class ThemeMode(val label: String) { BLUE("Blue & white"), GREEN("Green & white"), DARK("Black & white") }
 data class DeviceSim(val subscriptionId: Int, val slotIndex: Int, val displayName: String, val carrier: String) {
@@ -31,6 +31,8 @@ data class Conversation(
     val archived: Boolean = false,
     val topic: String = "general",
     val subscriptionId: Int? = null,
+    val spam: Boolean = false,
+    val blocked: Boolean = false,
 ) {
     val initials: String get() = name.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
 }
@@ -62,11 +64,13 @@ fun aggregateDelivery(parts: List<PartResult>): Delivery = when {
 fun filterConversations(items: List<Conversation>, folder: Folder, line: SimLine?, query: String): List<Conversation> {
     val search = query.trim()
     return items.filter { c ->
-        val folderMatch = when (folder) {
+        val unwanted = c.spam || c.blocked
+        val folderMatch = if (folder == Folder.SPAM) unwanted else !unwanted && when (folder) {
             Folder.ARCHIVED -> c.archived
             Folder.INBOX -> !c.archived
             Folder.UNREAD -> !c.archived && c.unread > 0
             Folder.STARRED -> !c.archived && c.starred
+            Folder.SPAM -> false
         }
         folderMatch && (line == null || c.line == line) &&
             (search.isEmpty() || c.name.contains(search, true) || c.number.contains(search, true) || c.messages.any { it.text.contains(search, true) })

@@ -8,6 +8,7 @@ import com.gediadeepak.smsapp.core.*
 import com.gediadeepak.smsapp.data.PreferenceStore
 import com.gediadeepak.smsapp.data.SandeshDatabase
 import com.gediadeepak.smsapp.telephony.SmsAccess
+import com.gediadeepak.smsapp.audio.HeadsetReadout
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -44,10 +45,13 @@ class SmsBackupRepository(private val context: Context) {
         } ?: error("Could not read the SMS inbox.")
         val metadata = JSONArray()
         database.metadata().forEach { (id, flags) -> addresses[id]?.let { address -> metadata.put(JSONObject()
-            .put("address", address).put("starred", flags.starred).put("archived", flags.archived).put("alias", flags.alias)) } }
+            .put("address", address).put("starred", flags.starred).put("archived", flags.archived).put("alias", flags.alias).put("spam", flags.spam)) } }
         val p = preferences.load()
+        val blockedSenders = database.blockedSenders().values.toList()
+        require(blockedSenders.size <= 10_000) { "This backup exceeds the 10,000 blocked-sender limit." }
         val root = JSONObject().put("format", FORMAT).put("version", 1).put("createdAt", System.currentTimeMillis())
             .put("messageCount", messages.length()).put("messages", messages).put("threads", metadata)
+            .put("blockedSenders", JSONArray(blockedSenders))
             .put("preferences", JSONObject().put("personal", p.personalLabel).put("work", p.workLabel).put("theme", p.theme.name).put("suggestions", p.suggestions))
         return root.toString().toByteArray(Charsets.UTF_8).also { require(it.size <= BackupCipher.MAX_PLAIN_BYTES) { "This backup exceeds the 16 MiB limit." } }
     }
@@ -61,6 +65,7 @@ class SmsBackupRepository(private val context: Context) {
         // Parse and validate ALL records before the first provider write.
         val root = parse(plain)
         requireAccess()
+        HeadsetReadout.stop(context)
         val threads = mutableMapOf<String, Long>()
         val existingThreads = mutableSetOf<Long>()
         resolver.query(Telephony.Sms.CONTENT_URI, arrayOf("thread_id"), null, null, null)?.use { c -> while (c.moveToNext()) existingThreads.add(c.getLong(0)) }
@@ -99,8 +104,9 @@ class SmsBackupRepository(private val context: Context) {
                 val threadId = thread(m.getString("address"))
                 database.updateMetadata(threadId.toString()) { existing -> existing.copy(
                     starred = existing.starred || m.getBoolean("starred"), archived = if (threadId in existingThreads) existing.archived else m.getBoolean("archived"),
-                    alias = existing.alias.ifBlank { m.getString("alias") }) }
+                    alias = existing.alias.ifBlank { m.getString("alias") }, spam = existing.spam || m.optBoolean("spam", false)) }
             }
+            root.optJSONArray("blockedSenders")?.let { senders -> repeat(senders.length()) { database.setSenderBlocked(senders.getString(it), true) } }
             val p = root.getJSONObject("preferences")
             preferences.save(preferences.load().copy(personalLabel = p.getString("personal"), workLabel = p.getString("work"),
                 theme = ThemeMode.valueOf(p.getString("theme")), suggestions = p.getBoolean("suggestions"), defaultSubscriptionId = null))
@@ -145,6 +151,12 @@ class SmsBackupRepository(private val context: Context) {
             val item = metadata.getJSONObject(index)
             require(item.getString("address").length in 1..512 && item.getString("alias").length <= 60) { "Invalid conversation metadata." }
             item.getBoolean("starred"); item.getBoolean("archived")
+            if (item.has("spam")) item.getBoolean("spam")
+        }
+        if (root.has("blockedSenders")) {
+            val senders = root.getJSONArray("blockedSenders")
+            require(senders.length() <= 10_000) { "Too many blocked senders." }
+            repeat(senders.length()) { val sender = senders.getString(it); require(sender.length in 1..512 && sender.isNotBlank()) { "Invalid blocked sender." } }
         }
         val p = root.getJSONObject("preferences")
         require(p.getString("personal").length in 1..18 && p.getString("work").length in 1..18) { "Invalid SIM labels." }

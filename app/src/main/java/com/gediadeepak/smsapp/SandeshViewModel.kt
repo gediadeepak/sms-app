@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.gediadeepak.smsapp.core.*
 import com.gediadeepak.smsapp.data.*
 import com.gediadeepak.smsapp.telephony.*
+import com.gediadeepak.smsapp.audio.HeadsetReadout
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,12 +25,13 @@ data class InboxState(
     val defaultSms: Boolean = false, val permissionsGranted: Boolean = false, val hasTelephony: Boolean = true,
     val loading: Boolean = false, val sending: Boolean = false, val error: String? = null, val pendingMms: Int = 0,
     val notificationStatus: SmsNotificationStatus = SmsNotificationStatus.ENABLED,
+    val blockedSenders: List<String> = emptyList(),
 ) {
     val selected get() = conversations.find { it.id == selectedId }
     val visible get() = filterConversations(conversations, folder, filterLine, query)
-    val unreadCount get() = conversations.count { !it.archived && it.unread > 0 }
+    val unreadCount get() = conversations.count { !it.archived && !it.spam && !it.blocked && it.unread > 0 }
     val ready get() = defaultSms && permissionsGranted
-    val canSend get() = ready && !sending && sendSubscriptionId != null && subscriptions.any { it.subscriptionId == sendSubscriptionId }
+    val canSend get() = ready && !sending && selected?.spam != true && selected?.blocked != true && sendSubscriptionId != null && subscriptions.any { it.subscriptionId == sendSubscriptionId }
 }
 
 class SandeshViewModel(application: Application) : AndroidViewModel(application) {
@@ -98,10 +100,11 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             if (!observerRegistered) observerRegistered = runCatching { context.contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer) }.isSuccess
             try {
                 val result = withContext(Dispatchers.IO) { repository.drainPendingIncoming(); repository.load(sims) to database.pendingMmsCount() }
+                val blocked = withContext(Dispatchers.IO) { database.blockedSenders().values.toList() }
                 if (version != refreshVersion || !SmsAccess.ready(context)) return@launch
                 val visibleThread = state.value.selectedId.takeIf { conversationVisible() }
                 if (result.first.any { it.id == visibleThread && it.unread > 0 }) withContext(Dispatchers.IO) { repository.markRead(visibleThread!!) }
-                mutableState.update { it.copy(conversations = result.first.map { c -> if (c.id == visibleThread) c.copy(unread = 0) else c } + emptyThreads.values.filter { draft -> result.first.none { loaded -> loaded.id == draft.id } }, loading = false, pendingMms = result.second) }
+                mutableState.update { it.copy(conversations = result.first.map { c -> if (c.id == visibleThread) c.copy(unread = 0) else c } + emptyThreads.values.filter { draft -> result.first.none { loaded -> loaded.id == draft.id } }, loading = false, pendingMms = result.second, blockedSenders = blocked) }
             } catch (e: CancellationException) { throw e }
             catch (_: SecurityException) { mutableState.update { it.copy(loading = false, permissionsGranted = false, conversations = emptyList(), error = "SMS access changed. Check Sandesh’s permissions.") } }
             catch (_: Exception) { mutableState.update { it.copy(loading = false, error = "Could not load the SMS inbox. Check access and try Refresh.") } }
@@ -138,6 +141,41 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     fun sendSubscription(id: Int?) { mutableState.update { it.copy(sendSubscriptionId = id, sendLine = it.subscriptions.find { sim -> sim.subscriptionId == id }?.line ?: SimLine.UNKNOWN) } }
     fun star() { editMetadata { it.copy(starred = !it.starred) } }
     fun archive() { editMetadata { it.copy(archived = !it.archived) }; back() }
+    fun moveToSpam(block: Boolean) {
+        val selected = state.value.selected ?: return
+        viewModelScope.launch {
+            try {
+                HeadsetReadout.stop(context)
+                withContext(Dispatchers.IO) {
+                    if (block) database.changeBlockedSender(selected.number, true, listOf(selected.id))
+                    else database.updateMetadata(selected.id) { it.copy(spam = true, archived = false) }
+                    state.value.conversations.filter { it.id == selected.id || (block && spamSenderKey(it.number) == spamSenderKey(selected.number)) }.forEach { SmsNotifications.cancel(context, it.id) }
+                }
+                emptyThreads.remove(selected.id); back(); refresh()
+            } catch (_: Exception) { reportError("Could not update the spam list. Your messages were kept.") }
+        }
+    }
+    fun restoreFromSpam() {
+        val selected = state.value.selected ?: return
+        if (selected.blocked) { unblockSender(selected.number); return }
+        viewModelScope.launch {
+            try { withContext(Dispatchers.IO) { database.updateMetadata(selected.id) { it.copy(spam = false, archived = false) } }; back(); refresh() }
+            catch (_: Exception) { reportError("Could not restore this conversation. Your messages were kept.") }
+        }
+    }
+    fun unblockSender(address: String) {
+        val affected = state.value.conversations.filter { spamSenderKey(it.number) == spamSenderKey(address) }.map { it.id }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    database.changeBlockedSender(address, false, affected)
+                }
+                affected.forEach { emptyThreads.remove(it) }
+                if (state.value.selectedId in affected) back()
+                refresh()
+            } catch (_: Exception) { reportError("Could not unblock this sender. Try again.") }
+        }
+    }
     private fun editMetadata(edit: (ThreadMetadata) -> ThreadMetadata) {
         val id = state.value.selectedId ?: return
         viewModelScope.launch { withContext(Dispatchers.IO) { repository.updateMetadata(id, edit) }; refresh() }
@@ -168,9 +206,10 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             try {
                 val id = withContext(Dispatchers.IO) { repository.threadId(destination).also { id -> if (name.isNotBlank()) repository.updateMetadata(id) { it.copy(alias = name.trim().take(60)) } } }
+                val blocked = withContext(Dispatchers.IO) { database.isSenderBlocked(destination) }
                 val line = state.value.subscriptions.find { it.subscriptionId == subscription }?.line ?: SimLine.UNKNOWN
                 if (state.value.conversations.none { it.id == id }) {
-                    val c = Conversation(id, name.trim().ifBlank { destination }, destination, line, subscriptionId = subscription)
+                    val c = Conversation(id, name.trim().ifBlank { destination }, destination, line, subscriptionId = subscription, blocked = blocked)
                     emptyThreads[id] = c; mutableState.update { it.copy(conversations = it.conversations + c) }
                 }
                 select(id); sendSubscription(subscription); if (body != null) draft(body)

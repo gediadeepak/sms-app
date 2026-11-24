@@ -98,7 +98,7 @@ private fun SmsBackupAccess(ready: Boolean) {
 
 @Composable
 private fun BackupLimits() {
-    Text("Includes SMS history, stars, archives, aliases and appearance. SMS only, up to 16 MiB / 100,000 messages. Restore keeps your inbox, skips duplicates and never sends restored messages. Historical SIMs show Unknown SIM.", color = Muted, fontSize = 12.sp, lineHeight = 21.sp)
+    Text("Includes SMS history, stars, archives, aliases, spam flags, blocked senders and appearance. SMS only, up to 16 MiB / 100,000 messages. Restore keeps your inbox, merges blocked senders, skips duplicates and never sends restored messages. Historical SIMs show Unknown SIM.", color = Muted, fontSize = 12.sp, lineHeight = 21.sp)
 }
 
 @Composable
@@ -106,7 +106,7 @@ internal fun RestoreConfirmation(state: AccountState, model: AccountViewModel) {
     val busy = state.busy != null
     state.preview?.let { preview ->
         AlertDialog(onDismissRequest = { if (!busy) model.clearRestore() }, title = { Text("Restore this backup?") },
-            text = { Text("${preview.messageCount} SMS messages\nCreated ${DateFormat.getDateTimeInstance().format(Date(preview.createdAt))}\n\nExisting messages will be kept, duplicates skipped, and saved messages will not be sent. The default sending SIM will return to Ask every time.") },
+            text = { Text("${preview.messageCount} SMS messages\nCreated ${DateFormat.getDateTimeInstance().format(Date(preview.createdAt))}\n\nExisting messages will be kept, duplicates skipped, and saved messages will not be sent. Saved spam flags and blocked senders will also be restored. The default sending SIM will return to Ask every time.") },
             confirmButton = { Button(onClick = model::confirmRestore, enabled = !busy) { Text(if (busy) "Restoring…" else "Restore messages") } },
             dismissButton = { TextButton(onClick = model::clearRestore, enabled = !busy) { Text("Cancel") } })
     }

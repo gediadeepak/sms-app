@@ -85,7 +85,7 @@ internal fun NewConversationDialog(state: InboxState, onCreate: (String, String,
 }
 
 @Composable
-internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onTestNotifications: () -> Unit, onAppSettings: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onDismiss: () -> Unit) {
+internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onTestNotifications: () -> Unit, onAppSettings: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onBlockedSenders: () -> Unit, onHeadset: () -> Unit, onDismiss: () -> Unit) {
     val preferences = state.preferences
     var personal by rememberSaveable { mutableStateOf(preferences.personalLabel) }; var work by rememberSaveable { mutableStateOf(preferences.workLabel) }
     var defaultId by rememberSaveable { mutableStateOf(preferences.defaultSubscriptionId) }; var suggestions by rememberSaveable { mutableStateOf(preferences.suggestions) }
@@ -95,6 +95,8 @@ internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, on
             Text("MAKE YOURSELF AT HOME", fontSize = 11.sp, color = Muted)
             OutlinedButton(onClick = onAccount, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.AccountCircle, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Account") }
             OutlinedButton(onClick = onBackup, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Backup, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Backup & restore") }
+            OutlinedButton(onClick = onBlockedSenders, modifier = Modifier.fillMaxWidth()) { Text("Blocked senders (${state.blockedSenders.size})") }
+            OutlinedButton(onClick = onHeadset, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Headphones, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Headset readout") }
             Text("Appearance", fontWeight = FontWeight.Medium); ThemeOptions(theme) { theme = it }
             OutlinedTextField(value = personal, onValueChange = { personal = it.take(18) }, label = { Text("SIM 1 label") }, singleLine = true)
             OutlinedTextField(value = work, onValueChange = { work = it.take(18) }, label = { Text("SIM 2 label") }, singleLine = true)

@@ -18,12 +18,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -40,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gediadeepak.smsapp.InboxState
 import com.gediadeepak.smsapp.SandeshViewModel
 import com.gediadeepak.smsapp.telephony.SmsNotificationStatus
+import com.gediadeepak.smsapp.audio.HeadsetReadout
 import com.gediadeepak.smsapp.core.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,15 +50,19 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
-fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings: () -> Unit = {}, onNotifications: () -> Unit = {}, onAccount: () -> Unit = {}, onBackup: () -> Unit = {}, onTestNotifications: () -> Unit = {}) {
+fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings: () -> Unit = {}, onNotifications: () -> Unit = {}, onAccount: () -> Unit = {}, onBackup: () -> Unit = {}, onTestNotifications: () -> Unit = {}, onReadMessage: (String) -> Unit = {}) {
     val state by model.state.collectAsStateWithLifecycle()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var newMessage by rememberSaveable { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var assistant by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(drawer.currentValue, drawer.targetValue, newMessage, settings, assistant) {
-        model.setContentOverlayVisible(drawer.isOpen || drawer.targetValue == DrawerValue.Open || newMessage || settings || assistant)
+    var blockedSenders by rememberSaveable { mutableStateOf(false) }
+    var headsetSettings by rememberSaveable { mutableStateOf(false) }
+    var spamAction by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.selected == null) { if (state.selected == null) spamAction = null }
+    LaunchedEffect(drawer.currentValue, drawer.targetValue, newMessage, settings, assistant, blockedSenders, headsetSettings, spamAction) {
+        model.setContentOverlayVisible(drawer.isOpen || drawer.targetValue == DrawerValue.Open || newMessage || settings || assistant || blockedSenders || headsetSettings || spamAction != null)
     }
     if (state.error != null) AlertDialog(onDismissRequest = model::clearError, title = { Text("Sandesh needs attention") }, text = { Text(state.error.orEmpty()) }, confirmButton = { TextButton(onClick = model::clearError) { Text("OK") } })
     if (!state.ready) {
@@ -68,7 +75,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
         LaunchedEffect(wide) { if (wide && state.selected == null) state.visible.firstOrNull()?.let { model.select(it.id) } }
         val openSettings = { settings = true; scope.launch { drawer.close() }; Unit }
         val startMessage = { newMessage = true; scope.launch { drawer.close() }; Unit }
-        BackHandler(enabled = state.selectedId != null && !drawer.isOpen && !newMessage && !settings && !assistant) { model.back() }
+        BackHandler(enabled = state.selectedId != null && !drawer.isOpen && !newMessage && !settings && !assistant && !blockedSenders && !headsetSettings && spamAction == null) { model.back() }
         val navigation: @Composable () -> Unit = {
             Sidebar(state, onFolder = { model.folder(it); scope.launch { drawer.close() } },
                 onLine = { model.filter(it); scope.launch { drawer.close() } }, onNew = startMessage, onSettings = openSettings)
@@ -79,7 +86,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
                 topBar = {
                     if (!wide && state.selected != null) {
                         ConversationHeader(state.selected!!, model::back, model::star, model::archive,
-                            if (state.preferences.suggestions) ({ assistant = true }) else null)
+                            if (state.preferences.suggestions && !state.selected!!.spam && !state.selected!!.blocked) ({ assistant = true }) else null, onSpamAction = { spamAction = it })
                     } else {
                         TopAppBar(title = {
                             Column {
@@ -109,7 +116,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
                     }
                     if (wide) VerticalDivider()
                     if (wide || state.selectedId != null) {
-                        Thread(state, Modifier.weight(1f), model, showHeader = wide, onAssistant = { assistant = true })
+                        Thread(state, Modifier.weight(1f), model, showHeader = wide, onAssistant = { assistant = true }, onSpamAction = { spamAction = it }, onReadMessage = onReadMessage)
                     }
                     if (desktop && state.preferences.suggestions) {
                         VerticalDivider()
@@ -126,7 +133,20 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
     }
     if (newMessage) NewConversationDialog(state, { name, number, id -> model.newConversation(name, number, id) }) { newMessage = false }
     if (settings) SettingsDialog(state, onSave = { model.savePreferences(it); settings = false }, onNotifications = onNotifications, onTestNotifications = onTestNotifications, onAppSettings = onAppSettings,
-        onAccount = { settings = false; onAccount() }, onBackup = { settings = false; onBackup() }, onDismiss = { settings = false })
+        onAccount = { settings = false; onAccount() }, onBackup = { settings = false; onBackup() }, onBlockedSenders = { settings = false; blockedSenders = true },
+        onHeadset = { settings = false; headsetSettings = true }, onDismiss = { settings = false })
+    if (blockedSenders) BlockedSendersDialog(state.blockedSenders, model::unblockSender) { blockedSenders = false }
+    if (headsetSettings) HeadsetSettingsDialog(state.notificationStatus, onNotifications) { headsetSettings = false }
+    if (spamAction != null && state.selected != null) {
+        val action = spamAction!!
+        val restoring = action == "restore"
+        AlertDialog(onDismissRequest = { spamAction = null }, title = { Text(if (restoring) "Move to inbox?" else if (action == "block") "Block this sender?" else "Move to Spam?") },
+            text = { Text(if (restoring) "${state.selected!!.name} will return to your inbox. If blocked, this sender will also be unblocked. No messages will be deleted."
+                else if (action == "block") "SMS from ${state.selected!!.name} will be kept silently in Spam inside Sandesh. Existing messages are preserved. Calls and other apps are unaffected."
+                else "This conversation will move to Spam and future SMS in it will be silent. You can restore it from Spam at any time.") },
+            confirmButton = { Button(onClick = { spamAction = null; if (restoring) model.restoreFromSpam() else model.moveToSpam(action == "block") }) { Text(if (restoring) "Move to inbox" else if (action == "block") "Block sender" else "Move to Spam") } },
+            dismissButton = { TextButton(onClick = { spamAction = null }) { Text("Cancel") } })
+    }
     if (assistant && state.selected != null && state.preferences.suggestions) Dialog(onDismissRequest = { assistant = false }) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Assistant(state, model, Modifier.fillMaxWidth().heightIn(max = 650.dp), onDismiss = { assistant = false }, onInsert = { assistant = false })
@@ -147,12 +167,13 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
         Spacer(Modifier.height(20.dp))
         Folder.entries.forEach { folder ->
             val selected = state.folder == folder
-            val vector = when (folder) { Folder.INBOX -> Icons.Outlined.Inbox; Folder.UNREAD -> Icons.Outlined.MarkEmailUnread; Folder.STARRED -> Icons.Outlined.StarOutline; Folder.ARCHIVED -> Icons.Outlined.Archive }
+            val vector = when (folder) { Folder.INBOX -> Icons.Outlined.Inbox; Folder.UNREAD -> Icons.Outlined.MarkEmailUnread; Folder.STARRED -> Icons.Outlined.StarOutline; Folder.ARCHIVED -> Icons.Outlined.Archive; Folder.SPAM -> Icons.Outlined.Report }
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp).background(if (selected) Sage else Color.Transparent, RoundedCornerShape(8.dp))
                 .clickable { onFolder(folder) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(vector, null, tint = if (selected) Forest else Muted, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp))
                 Text(folder.label, fontSize = 14.sp, color = if (selected) Forest else Muted, modifier = Modifier.weight(1f))
                 if (folder == Folder.UNREAD && state.unreadCount > 0) Badge(containerColor = Forest) { Text(state.unreadCount.toString()) }
+                if (folder == Folder.SPAM) state.conversations.count { it.spam || it.blocked }.takeIf { it > 0 }?.let { Text(it.toString(), fontSize = 12.sp, color = Muted) }
             }
         }
         Text("YOUR LINES", fontSize = 11.sp, color = Muted, letterSpacing = 1.sp, modifier = Modifier.padding(top = 30.dp, bottom = 14.dp))
@@ -246,7 +267,8 @@ private fun LineFilter(label: String, selected: Boolean, line: SimLine? = null, 
 }
 
 @Composable
-private fun ConversationHeader(c: Conversation, onBack: (() -> Unit)?, onStar: () -> Unit, onArchive: () -> Unit, onAssistant: (() -> Unit)?) {
+private fun ConversationHeader(c: Conversation, onBack: (() -> Unit)?, onStar: () -> Unit, onArchive: () -> Unit, onAssistant: (() -> Unit)?, onSpamAction: (String) -> Unit) {
+    var more by remember { mutableStateOf(false) }
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.fillMaxWidth().then(if (onBack != null) Modifier.statusBarsPadding() else Modifier).padding(horizontal = 6.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to inbox", tint = Muted) }
@@ -254,23 +276,38 @@ private fun ConversationHeader(c: Conversation, onBack: (() -> Unit)?, onStar: (
             Avatar(c.initials, c.name, small = true); Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) { Text(c.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(c.number, fontSize = 10.sp, color = Muted, maxLines = 1) }
             IconButton(onClick = onStar, modifier = Modifier.size(36.dp)) { Icon(if (c.starred) Icons.Outlined.Star else Icons.Outlined.StarOutline, if (c.starred) "Unstar conversation" else "Star conversation", tint = if (c.starred) Work else Muted, modifier = Modifier.size(20.dp)) }
-            IconButton(onClick = onArchive, modifier = Modifier.size(36.dp)) { Icon(if (c.archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive, if (c.archived) "Restore conversation" else "Archive conversation", tint = Muted, modifier = Modifier.size(20.dp)) }
+            if (!c.spam && !c.blocked) IconButton(onClick = onArchive, modifier = Modifier.size(36.dp)) { Icon(if (c.archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive, if (c.archived) "Restore conversation" else "Archive conversation", tint = Muted, modifier = Modifier.size(20.dp)) }
             if (onAssistant != null) IconButton(onClick = onAssistant, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.AutoAwesome, "Open demo assistant", tint = Muted, modifier = Modifier.size(20.dp)) }
+            Box {
+                IconButton(onClick = { more = true }, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.MoreVert, "Conversation options", tint = Muted) }
+                DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                    if (c.spam || c.blocked) DropdownMenuItem(text = { Text(if (c.blocked) "Unblock & move to inbox" else "Not spam · move to inbox") }, onClick = { more = false; onSpamAction("restore") })
+                    else {
+                        DropdownMenuItem(text = { Text("Move to Spam") }, onClick = { more = false; onSpamAction("spam") })
+                        DropdownMenuItem(text = { Text("Block sender") }, onClick = { more = false; onSpamAction("block") })
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewModel, showHeader: Boolean, onAssistant: () -> Unit) {
+private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewModel, showHeader: Boolean, onAssistant: () -> Unit, onSpamAction: (String) -> Unit, onReadMessage: (String) -> Unit) {
     val c = state.selected
     if (c == null) {
         Box(modifier.fillMaxHeight(), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(30.dp)) { Icon(Icons.Outlined.Forum, null, Modifier.size(48.dp), tint = Forest); Text("Make a little connection.", fontSize = 22.sp, modifier = Modifier.padding(top = 20.dp)); Text("Choose a conversation to get started.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp)) } }
         return
     }
     val scroll = rememberLazyListState()
+    val readAvailable = !c.spam && !c.blocked && HeadsetReadout.selected(LocalContext.current) != null && state.notificationStatus == SmsNotificationStatus.ENABLED
     LaunchedEffect(c.id, c.messages.size) { if (c.messages.isNotEmpty()) scroll.scrollToItem(c.messages.lastIndex) }
     Column(modifier.fillMaxHeight()) {
-        if (showHeader) ConversationHeader(c, null, model::star, model::archive, if (state.preferences.suggestions) onAssistant else null)
+        if (showHeader) ConversationHeader(c, null, model::star, model::archive, if (state.preferences.suggestions && !c.spam && !c.blocked) onAssistant else null, onSpamAction)
+        if (c.spam || c.blocked) Row(Modifier.fillMaxWidth().background(Sage).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (c.blocked) "Blocked sender · messages kept in Spam" else "Spam · notifications silenced", Modifier.weight(1f), fontSize = 12.sp, color = Forest)
+            TextButton(onClick = { onSpamAction("restore") }) { Text(if (c.blocked) "Unblock" else "Not spam") }
+        }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.SimCard, null, Modifier.size(14.dp), tint = Muted); Spacer(Modifier.width(7.dp)); Text("Conversation on", color = Muted, fontSize = 11.sp); Spacer(Modifier.width(8.dp)); LineBadge(c.line, state.preferences)
@@ -287,10 +324,10 @@ private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewMode
                         HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
-                MessageBubble(m, state.preferences)
+                MessageBubble(m, state.preferences, if (readAvailable && !m.outgoing) ({ onReadMessage(m.id) }) else null)
             }
         }
-        Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 12.dp)) {
+        if (!c.spam && !c.blocked) Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 12.dp)) {
             if (state.preferences.suggestions) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.AutoAwesome, null, Modifier.size(14.dp), tint = Muted); Spacer(Modifier.width(6.dp)); Text("A little help replying", fontSize = 11.sp, color = Muted) }
                 TextButton(onClick = onAssistant) { Text("Show suggestions", fontSize = 11.sp) }
@@ -320,7 +357,7 @@ private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewMode
 }
 
 @Composable
-private fun MessageBubble(message: Message, preferences: Preferences) {
+private fun MessageBubble(message: Message, preferences: Preferences, onRead: (() -> Unit)? = null) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = if (message.outgoing) Alignment.End else Alignment.Start) {
         Surface(shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomEnd = if (message.outgoing) 3.dp else 14.dp, bottomStart = if (message.outgoing) 14.dp else 3.dp),
             color = if (message.outgoing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(.9f)) {
@@ -328,6 +365,7 @@ private fun MessageBubble(message: Message, preferences: Preferences) {
         }
         Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("${clock(message.timestamp)} · ${preferences.label(message.line)}", fontSize = 10.sp, color = Muted)
+            if (onRead != null) IconButton(onClick = onRead, modifier = Modifier.size(28.dp)) { Icon(Icons.AutoMirrored.Outlined.VolumeUp, "Read message through selected headset", Modifier.size(15.dp), tint = Forest) }
             if (message.outgoing) { Spacer(Modifier.width(5.dp)); Icon(if (message.delivery == Delivery.DELIVERED) Icons.Outlined.DoneAll else if (message.delivery == Delivery.FAILED || message.delivery == Delivery.UNDELIVERED) Icons.Outlined.ErrorOutline else Icons.Outlined.Done, null, Modifier.size(12.dp), tint = Muted); Spacer(Modifier.width(3.dp)); Text(when (message.delivery) { Delivery.SENDING -> "Sending…"; Delivery.SENT -> "Sent"; Delivery.DELIVERED -> "Delivered"; Delivery.FAILED -> "Send failed · check before retrying"; Delivery.UNDELIVERED -> "Not delivered"; else -> "Status unknown" }, fontSize = 10.sp, color = if (message.delivery == Delivery.FAILED || message.delivery == Delivery.UNDELIVERED) MaterialTheme.colorScheme.error else Muted) }
         }
     }
