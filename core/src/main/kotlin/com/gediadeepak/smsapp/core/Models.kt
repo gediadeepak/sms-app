@@ -43,6 +43,9 @@ data class Preferences(
     val suggestions: Boolean = true,
     val theme: ThemeMode = ThemeMode.BLUE,
     val defaultSubscriptionId: Int? = null,
+    val aiEnabled: Boolean = false,
+    val aiSummaries: Boolean = true,
+    val aiReplies: Boolean = true,
 ) {
     fun label(line: SimLine): String = when (line) { SimLine.PERSONAL -> personalLabel; SimLine.WORK -> workLabel; SimLine.UNKNOWN -> "Unknown SIM" }
 }
@@ -79,19 +82,3 @@ fun filterConversations(items: List<Conversation>, folder: Folder, line: SimLine
 
 fun normaliseNumber(number: String): String = number.filter(Char::isDigit)
 fun validNumber(number: String): Boolean = number.matches(Regex("\\+?[0-9 ()-]{6,22}")) && normaliseNumber(number).length in 6..15
-
-interface ReplyAssistant { fun suggest(conversation: Conversation, tone: Tone): List<String> }
-
-/** Offline examples only. A future API-backed assistant can implement the same interface. */
-class DemoReplyAssistant : ReplyAssistant {
-    override fun suggest(conversation: Conversation, tone: Tone): List<String> {
-        if (tone == Tone.PROFESSIONAL) return listOf("Thank you for your message. I’ll get back to you shortly.", "That works well for me. Thank you.", "Thanks for the update. I’ll review this and follow up.")
-        if (tone == Tone.CONCISE) return listOf("Sounds good!", "Thanks for letting me know.", "Perfect, see you then!")
-        return when (conversation.topic) {
-            "coffee" -> listOf("Sounds perfect! See you at 3. ☕", "Count me in! Looking forward to a catch-up.", "3 works for me! Shall I bring anything?")
-            "family" -> listOf("That sounds lovely! Wouldn’t miss it 😊", "Yes please! Can I bring anything?", "Looking forward to Sunday!")
-            "project" -> listOf("Thanks for the update! I’ll take a look.", "That works for me. Let’s put it in the calendar.", "Looking forward to seeing it!")
-            else -> listOf("Great to hear from you!", "Sounds good to me. Let’s catch up soon.", "Of course, happy to help 😊")
-        }
-    }
-}

@@ -36,11 +36,10 @@ class InboxRulesTest {
         assertEquals(normaliseNumber("+44 (7700) 900123"), normaliseNumber("447700900123"))
     }
 
-    @Test fun `reply suggestions do not modify message history`() {
+    @Test fun `AI context preparation does not modify message history`() {
         val original = items.first()
         val before = original.messages.toList()
-        val ideas = DemoReplyAssistant().suggest(original, Tone.FRIENDLY)
-        assertTrue(ideas.isNotEmpty())
+        AiContextPolicy.prepare(original)
         assertEquals(before, original.messages)
     }
 }

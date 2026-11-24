@@ -30,6 +30,9 @@ bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "boun
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
 firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
+firebase-ai = { module = "com.google.firebase:firebase-ai" }
+firebase-appcheck-debug = { module = "com.google.firebase:firebase-appcheck-debug" }
+firebase-appcheck-integrity = { module = "com.google.firebase:firebase-appcheck-playintegrity" }
 credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 credentials-google = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }

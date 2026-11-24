@@ -12,8 +12,8 @@ android {
         applicationId = "com.sandesh.app"
         minSdk = 24
         targetSdk = 37
-        versionCode = 9
-        versionName = "0.4.1"
+        versionCode = 10
+        versionName = "0.5.0"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -55,6 +55,9 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    implementation(libs.firebase.ai)
+    debugImplementation(libs.firebase.appcheck.debug)
+    releaseImplementation(libs.firebase.appcheck.integrity)
     implementation(libs.credentials)
     implementation(libs.credentials.google)
     // Google sign-in pulls in an older Fragment; Activity Result requires a modern version.

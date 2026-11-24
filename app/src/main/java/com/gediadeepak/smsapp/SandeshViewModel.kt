@@ -12,6 +12,7 @@ import com.gediadeepak.smsapp.core.*
 import com.gediadeepak.smsapp.data.*
 import com.gediadeepak.smsapp.telephony.*
 import com.gediadeepak.smsapp.audio.HeadsetReadout
+import com.gediadeepak.smsapp.ai.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,7 +42,84 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     private val database = SandeshDatabase.get(context)
     private val mutableState = MutableStateFlow(InboxState(preferences = preferences.load()))
     val state = mutableState.asStateFlow()
-    val assistant: ReplyAssistant = DemoReplyAssistant()
+    private val assistant = FirebaseSmsAssistant(context)
+    private val mutableAi = MutableStateFlow(AiUiState())
+    val ai = mutableAi.asStateFlow()
+    private val mutableAiAccess = MutableStateFlow(AiAccessState())
+    val aiAccess = mutableAiAccess.asStateFlow()
+    private var aiJob: Job? = null
+    private var aiGeneration = 0
+
+    fun checkAiAccess() {
+        if (mutableAiAccess.value.checking) return
+        mutableAiAccess.value = AiAccessState(checking = true)
+        viewModelScope.launch {
+            try {
+                assistant.verifyAccess()
+                mutableAiAccess.value = AiAccessState(message = "Device verification succeeded. No SMS was shared and no Gemini request was made. Model access and quota are checked when you generate an answer.")
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                mutableAiAccess.value = AiAccessState(message = if (e is AiRequestException) e.message else "Device verification could not complete. Try again later.")
+            }
+        }
+    }
+
+    fun cancelAi() {
+        aiGeneration++
+        aiJob?.cancel()
+        mutableAi.value = AiUiState()
+    }
+
+    private fun invalidateAiIfChanged() {
+        val current = mutableAi.value
+        val selected = state.value.selected
+        if (current.conversationId != null && (selected == null || selected.id != current.conversationId || selected.spam || selected.blocked ||
+                !state.value.ready || !SmsAccess.ready(context) || !state.value.preferences.aiEnabled || AiContextPolicy.prepare(selected).fingerprint != current.fingerprint)) {
+            cancelAi()
+        }
+    }
+
+    fun generateAi(task: AiTask, tone: Tone, expectedFingerprint: String) {
+        val snapshot = state.value
+        val conversation = snapshot.selected ?: return
+        if (!snapshot.ready || !SmsAccess.ready(context) || conversation.spam || conversation.blocked || !snapshot.preferences.aiEnabled ||
+            (task == AiTask.SUMMARY && !snapshot.preferences.aiSummaries) || (task == AiTask.REPLIES && !snapshot.preferences.aiReplies)) return
+        if (mutableAi.value.loading) return
+        val input = AiContextPolicy.prepare(conversation)
+        if (input.fingerprint != expectedFingerprint) {
+            mutableAi.value = AiUiState(error = "The conversation changed. Review the updated text preview before generating.")
+            return
+        }
+        cancelAi()
+        val generation = aiGeneration
+        mutableAi.value = AiUiState(conversation.id, input.fingerprint, loading = true)
+        aiJob = viewModelScope.launch {
+            try {
+                val answer = assistant.generate(input, task, tone)
+                invalidateAiIfChanged()
+                if (generation == aiGeneration) mutableAi.value = AiUiState(conversation.id, input.fingerprint, summary = answer.summary, replies = answer.replies)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                invalidateAiIfChanged()
+                if (generation == aiGeneration) mutableAi.value = AiUiState(conversation.id, input.fingerprint, error =
+                    if (e is AiRequestException) e.message else "AI is unavailable. Try again later.")
+            }
+        }
+    }
+
+    fun insertAiReply(text: String): Boolean {
+        invalidateAiIfChanged()
+        val result = mutableAi.value
+        val snapshot = state.value
+        if (result.conversationId != snapshot.selectedId || text !in result.replies || !snapshot.preferences.aiEnabled || !snapshot.preferences.aiReplies) return false
+        val combined = if (snapshot.draft.isBlank()) text else snapshot.draft + "\n" + text
+        if (combined.length > 1600) {
+            mutableAi.update { it.copy(error = "Your draft is too long to add this suggestion. Shorten it first.") }
+            return false
+        }
+        draft(combined)
+        return true
+    }
     private val drafts = mutableMapOf<String, Pair<String, Int?>>()
     private val emptyThreads = mutableMapOf<String, Conversation>()
     private var refreshJob: Job? = null
@@ -50,6 +128,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     private var completedRestore = 0
     fun setRestoring(value: Boolean, revision: Int) {
         restoring = value
+        if (value) cancelAi()
         if (value) refreshJob?.cancel()
         else if (revision != completedRestore) {
             completedRestore = revision
@@ -96,6 +175,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             if (!subscriptionListenerRegistered && SmsAccess.allowed(context, android.Manifest.permission.READ_PHONE_STATE)) {
                 runCatching { context.getSystemService(SubscriptionManager::class.java).addOnSubscriptionsChangedListener(subscriptionListener); subscriptionListenerRegistered = true }
             }
+            invalidateAiIfChanged()
             if (!ready) return@launch
             if (!observerRegistered) observerRegistered = runCatching { context.contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer) }.isSuccess
             try {
@@ -105,6 +185,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
                 val visibleThread = state.value.selectedId.takeIf { conversationVisible() }
                 if (result.first.any { it.id == visibleThread && it.unread > 0 }) withContext(Dispatchers.IO) { repository.markRead(visibleThread!!) }
                 mutableState.update { it.copy(conversations = result.first.map { c -> if (c.id == visibleThread) c.copy(unread = 0) else c } + emptyThreads.values.filter { draft -> result.first.none { loaded -> loaded.id == draft.id } }, loading = false, pendingMms = result.second, blockedSenders = blocked) }
+                invalidateAiIfChanged()
             } catch (e: CancellationException) { throw e }
             catch (_: SecurityException) { mutableState.update { it.copy(loading = false, permissionsGranted = false, conversations = emptyList(), error = "SMS access changed. Check Sandesh’s permissions.") } }
             catch (_: Exception) { mutableState.update { it.copy(loading = false, error = "Could not load the SMS inbox. Check access and try Refresh.") } }
@@ -112,6 +193,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     }
     private fun rememberDraft() { state.value.selectedId?.let { drafts[it] = state.value.draft to state.value.sendSubscriptionId } }
     fun select(id: String) {
+        if (state.value.selectedId != id) cancelAi()
         rememberDraft()
         if (state.value.conversations.none { it.id == id }) return
         val visible = conversationVisible()
@@ -123,7 +205,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             conversations = it.conversations.map { item -> if (item.id == id && visible) item.copy(unread = 0) else item }) }
         if (visible) viewModelScope.launch(Dispatchers.IO) { runCatching { repository.markRead(id) } }
     }
-    fun back() { rememberDraft(); mutableState.update { it.copy(selectedId = null, draft = "", sendSubscriptionId = null) } }
+    fun back() { cancelAi(); rememberDraft(); mutableState.update { it.copy(selectedId = null, draft = "", sendSubscriptionId = null) } }
     fun folder(folder: Folder) { back(); mutableState.update { it.copy(folder = folder) } }
     fun filter(line: SimLine?) { back(); mutableState.update { it.copy(filterLine = line) } }
     fun search(query: String) { mutableState.update { it.copy(query = query) } }
@@ -219,6 +301,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
         return null
     }
     fun savePreferences(value: Preferences) {
+        if (!value.aiEnabled || value.aiSummaries != state.value.preferences.aiSummaries || value.aiReplies != state.value.preferences.aiReplies) cancelAi()
         val previous = state.value.preferences.defaultSubscriptionId
         preferences.save(value); mutableState.update { it.copy(preferences = value) }
         if (previous != value.defaultSubscriptionId) sendSubscription(resolveSendingSubscription(value.defaultSubscriptionId, state.value.subscriptions.map { it.subscriptionId }))

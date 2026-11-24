@@ -109,7 +109,7 @@ class SmsBackupRepository(private val context: Context) {
             root.optJSONArray("blockedSenders")?.let { senders -> repeat(senders.length()) { database.setSenderBlocked(senders.getString(it), true) } }
             val p = root.getJSONObject("preferences")
             preferences.save(preferences.load().copy(personalLabel = p.getString("personal"), workLabel = p.getString("work"),
-                theme = ThemeMode.valueOf(p.getString("theme")), suggestions = p.getBoolean("suggestions"), defaultSubscriptionId = null))
+                theme = ThemeMode.valueOf(p.getString("theme")), suggestions = p.getBoolean("suggestions"), defaultSubscriptionId = null, aiEnabled = false))
         } catch (e: Exception) {
             throw IllegalStateException("Restore stopped after $inserted new messages ($skipped already present). Existing messages were kept. You can retry this backup without duplicating restored messages.", e)
         }

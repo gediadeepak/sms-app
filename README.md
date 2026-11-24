@@ -35,16 +35,18 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 - SQLite app database for starred/archived flags, aliases, send-part receipts and pending incoming SMS. Actual SMS remains in Android's system store.
 - Six saved themes: **Blue & white** (default), **Green & white**, **Black & white**, **Purple & white**, **Rose & white**, and **Amber & white**.
 - A theme-tinted, transparent winged-envelope-and-hand logo, adaptive launcher icon and the supplied flying GIF as the splash. The supporting hand, envelope and animated wordmark are preserved. Playback follows Android's animation-duration setting.
-- Search, unread/starred/archived folders, drafts during the current app process, external `sms:`/`smsto:` compose intents and optional offline reply examples.
+- Search, unread/starred/archived folders, drafts during the current app process, external `sms:`/`smsto:` compose intents and optional on-device draft tidying.
 - Optional Firebase email registration/login, email verification, password-reset emails and Google sign-in integration. Version 0.3.1 includes the supplied web OAuth client configuration; provider enablement and signing fingerprints still need to match the installed build. See [Firebase setup](docs/FIREBASE_SETUP.md).
 - Password-encrypted file export/restore without an account, plus encrypted Firestore backup/restore for verified accounts. Restores merge SMS, skip existing messages and never send restored messages. Backups include thread flags, aliases and appearance; they exclude MMS, drafts, credentials and send jobs.
+
+- Optional Firebase AI Logic conversation summaries and reply drafts, with independent settings, a preview before sharing, sensitive-message heuristics and local request limits. Generated replies never send automatically; existing drafts are preserved. App Check uses the debug provider locally and Play Integrity in release. AI settings/results are excluded from backups; restore disables AI.
 
 ## First launch
 
 1. Read the SMS-only limitations on setup before changing your default app.
 2. Choose Sandesh as the default SMS app, then grant SMS and phone-state access.
 3. In Settings, enable notifications and choose a default sending SIM or Ask every time.
-4. Choose your appearance. **Settings → Account** opens the account overview, with separate login, registration and password-reset pages. **Settings → Backup & restore** opens separate file and cloud backup pages. Cloud sign-in returns to the cloud page after a verified login. There is no AI API connection.
+4. Choose your appearance. **Settings → Account** opens the account overview, with separate login, registration and password-reset pages. **Settings → Backup & restore** opens separate file and cloud backup pages. Cloud sign-in returns to the cloud page after a verified login. **Settings → AI assistance** enables optional Gemini summaries and editable reply suggestions. AI starts off; generation shares only previewable, filtered text from the selected conversation. See [AI setup](docs/AI_SETUP.md) for App Check and provider configuration.
 
 No seeded conversations are loaded by the Android app. Version 0.3.0 switches to the owner's release application ID **com.sandesh.app**. It installs separately from the earlier com.gediadeepak.smsapp build and does not inherit its private settings. Android's system SMS history remains available after granting access. Uninstalling Sandesh removes app metadata, but does not delete SMS held by Android's system SMS provider.
 
@@ -55,7 +57,7 @@ No seeded conversations are loaded by the Android app. Version 0.3.0 switches to
 - **SMS only. MMS attachment downloading/display, group MMS and RCS are not implemented.** Making Sandesh default can affect those features. MMS notification PDUs are retained and an explicit unsupported-MMS notification/banner is shown; attachments are not retrieved. Keep your previous messaging app installed.
 - Backups are manual and limited to 16 MiB of uncompressed data / 100,000 SMS messages. Keep the independent backup password safe: account password reset cannot recover it. Cloud backup requires Firebase console setup and private Firestore rules before use. Android automatic app backup/device transfer stays excluded. Local SQLite storage is protected by Android, not by the backup password.
 - No contacts permission or automatic contact-name lookup; existing conversations show phone numbers, with optional aliases for conversations you create.
-- AI replies remain clearly labelled offline sample text; draft tidying is local text rules, and summaries are local recaps.
+- Cloud AI requires owner-side Firebase AI Logic, App Check and billing/quota setup. It is opt-in, may be inaccurate and processes the selected text with Google. Filtering is heuristic, not a privacy guarantee. Draft tidying remains on-device text rules.
 - Unknown/removed historical subscriptions show **Unknown SIM** rather than an invented line.
 - Telecom's “respond via message” service posts a review notification and opens a draft; it does not send silently. Notifications must be enabled for this flow.
 - The current inbox loads SMS history on a background thread; very large inbox performance needs device testing and future paging.
@@ -70,7 +72,7 @@ See the [physical-device test plan](docs/DEVICE_TEST_PLAN.md), [privacy notes](d
 - `app/.../backup`: validated SMS snapshots, non-destructive provider restore and encrypted Firestore chunks.
 - `app/.../ui`: Compose screens, six themes, branding and splash.
 - `SandeshViewModel`: inbox state, drafts, provider observation and background work.
-- `core`: Android-independent domain models, SIM selection and multipart-status rules, authenticated backup encryption, offline reply interface and unit tests. Currently Kotlin/JVM, not KMP/iOS yet.
+- `core`: Android-independent domain models, SIM selection and multipart-status rules, authenticated backup encryption, AI context filtering, request binding rules and unit tests. Currently Kotlin/JVM, not KMP/iOS yet.
 
 ## HTML reference
 

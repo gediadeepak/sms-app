@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gediadeepak.smsapp.InboxState
+import com.gediadeepak.smsapp.ai.AiAccessState
 import com.gediadeepak.smsapp.core.*
 import com.gediadeepak.smsapp.telephony.SmsNotificationStatus
 
@@ -39,7 +40,7 @@ internal fun SmsSetup(state: InboxState, onSetup: () -> Unit, onAppSettings: () 
             Surface(color = Sage, shape = MaterialTheme.shapes.medium) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Before you switch", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 Text("This build handles SMS only. MMS attachments, group MMS and RCS are not supported. Making Sandesh your default can affect those messages. Keep your previous messaging app installed.", fontSize = 14.sp, lineHeight = 23.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("Messages stay on this device unless you choose encrypted backup. AI reply ideas are offline samples; no messages are sent to an AI service.", fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text("Messages stay on this device unless you choose encrypted backup or use optional AI. AI is off by default; generating a summary or reply shares the selected, filtered conversation text with Google.", fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
             } }
             if (!state.hasTelephony) Text("No cellular messaging hardware was detected. Use a phone with SMS support.", color = MaterialTheme.colorScheme.error)
             Button(onClick = onSetup, enabled = state.hasTelephony, modifier = Modifier.fillMaxWidth()) { Text(if (state.defaultSms) "Allow SMS and SIM permissions" else "Choose Sandesh as default SMS app") }
@@ -92,7 +93,7 @@ internal fun NewConversationDialog(state: InboxState, onCreate: (String, String,
 }
 
 @Composable
-internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onTestNotifications: () -> Unit, onAppSettings: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onBlockedSenders: () -> Unit, onHeadset: () -> Unit, onDismiss: () -> Unit) {
+internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onTestNotifications: () -> Unit, onAppSettings: () -> Unit, aiAccess: AiAccessState, onAiCheck: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onBlockedSenders: () -> Unit, onHeadset: () -> Unit, onDismiss: () -> Unit) {
     val preferences = state.preferences
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
     var personal by rememberSaveable(preferences.personalLabel) { mutableStateOf(preferences.personalLabel) }
@@ -116,11 +117,16 @@ internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, on
                 LinePicker(preferences.defaultSubscriptionId, state.subscriptions, preferences, { onSave(preferences.copy(defaultSubscriptionId = it)) }, showAsk = true)
                 Text("With multiple SIMs, Ask every time leaves sending disabled until you choose a line in the composer. If a saved SIM disappears, choose again.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)
             }
-            SettingsSection("Reply ideas", "Offline suggestions", expanded == "replies", { toggle("replies") }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) { Text("Show reply ideas"); Text("Offline samples · no AI connection", fontSize = 12.sp, color = Muted) }
-                    Switch(checked = preferences.suggestions, onCheckedChange = { onSave(preferences.copy(suggestions = it)) })
-                }
+            SettingsSection("AI assistance", if (preferences.aiEnabled) "Gemini summaries and reply drafts" else "Off · optional Google Gemini features", expanded == "ai", { toggle("ai") }) {
+                Text("AI uses Google Gemini through Firebase. When you tap Generate, eligible text from the conversation you select is sent to Google. Review the preview first. Cloud processing and charges may apply.", fontSize = 13.sp, color = Muted, lineHeight = 21.sp)
+                AiSettingToggle("Enable AI", "Off by default · requests only when you choose", preferences.aiEnabled, { onSave(preferences.copy(aiEnabled = it)) })
+                AiSettingToggle("Show summarize button", "Summarize the selected conversation", preferences.aiSummaries, { onSave(preferences.copy(aiSummaries = it)) }, preferences.aiEnabled)
+                AiSettingToggle("Show reply suggestions", "Generate editable reply drafts", preferences.aiReplies, { onSave(preferences.copy(aiReplies = it)) }, preferences.aiEnabled)
+                Text("Drafts only. Suggestions never send an SMS automatically. You choose a suggestion, review or edit it, select your SIM and tap Send.", fontSize = 12.sp, color = Muted, lineHeight = 21.sp)
+                Text("Likely OTP, verification and financial messages are filtered locally. These rules are imperfect; review the exact text before sharing. Up to 30 requests per device per day, with a short cooldown. Provider quotas and billing still apply.", fontSize = 12.sp, color = Muted, lineHeight = 21.sp)
+                OutlinedButton(onClick = onAiCheck, enabled = !aiAccess.checking, modifier = Modifier.fillMaxWidth()) { Text(if (aiAccess.checking) "Checking verification…" else "Check device verification") }
+                Text("Checks this installation without sharing SMS or calling Gemini.", fontSize = 12.sp, color = Muted)
+                aiAccess.message?.let { Text(it, fontSize = 13.sp, color = Muted, lineHeight = 21.sp) }
             }
             SettingsSection("Notifications", if (state.notificationStatus == SmsNotificationStatus.ENABLED) "Message alerts are on" else "Message alerts need attention", expanded == "notifications", { toggle("notifications") }) {
                 Text(when (state.notificationStatus) {
@@ -169,4 +175,12 @@ private fun ThemeOptions(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
                 Spacer(Modifier.width(10.dp)); Text(mode.label)
             } }
     } }
+}
+
+@Composable
+private fun AiSettingToggle(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) { Text(title); Text(detail, fontSize = 12.sp, color = Muted) }
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+    }
 }

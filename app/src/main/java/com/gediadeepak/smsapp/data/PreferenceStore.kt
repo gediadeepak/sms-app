@@ -14,8 +14,13 @@ class PreferenceStore(context: Context) {
             else -> runCatching { ThemeMode.valueOf(saved!!) }.getOrDefault(ThemeMode.BLUE)
         },
         defaultSubscriptionId = storage.getInt("default_subscription", -1).takeIf { it >= 0 },
+        aiEnabled = storage.getBoolean("ai_enabled", false),
+        aiSummaries = storage.getBoolean("ai_summaries", true),
+        aiReplies = storage.getBoolean("ai_replies", true),
     )
     fun save(preferences: Preferences) { storage.edit().putString("personal", preferences.personalLabel).putString("work", preferences.workLabel)
         .putBoolean("suggestions", preferences.suggestions).putString("theme", preferences.theme.name)
-        .putInt("default_subscription", preferences.defaultSubscriptionId ?: -1).apply() }
+        .putInt("default_subscription", preferences.defaultSubscriptionId ?: -1)
+        .putBoolean("ai_enabled", preferences.aiEnabled).putBoolean("ai_summaries", preferences.aiSummaries)
+        .putBoolean("ai_replies", preferences.aiReplies).apply() }
 }

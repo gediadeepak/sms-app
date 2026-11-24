@@ -90,3 +90,15 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 - While Settings/account/backup is visible, receive an SMS in the previously selected conversation: it must stay unread and notify normally.
 - In Headset readout, open Speech voice settings. Verify Android TTS settings opens (or Android Settings as a fallback), then return to the same page and test an installed offline voice.
 - Select Purple, Rose and Amber in turn; check inbox, thread, Settings, account, backup and the next splash. Restart and perform an encrypted backup/restore to confirm each theme persists. Older app versions cannot restore backups containing a newly added theme name; use 0.4.1 or newer for those backups.
+
+## AI assistance (0.5.0)
+
+- Finish owner configuration from AI_SETUP.md. Use only synthetic text while validating Firebase; never use an actual OTP/payment message as a cloud test.
+- Fresh install/upgrade: AI starts off. Enable the master setting and independently hide summaries or replies; disable both and confirm thread AI controls disappear. Restart to verify preferences.
+- Preview contains only the chosen conversation's eligible bodies and You/Other person roles. Verify excluded-only threads cannot generate, long contexts show limits, and no names/addresses/SIM metadata/IDs/dates are added.
+- Generate each mode with synthetic messages. Test all reply tones and verify empty/filtered/invalid responses and network/App Check/quota failures produce useful errors without fake results.
+- Cancel waiting; switch threads or lose permissions during generation; turn AI off; move a thread to Spam or block it. Late responses must not appear in a different conversation or become insertable.
+- Insert a suggestion with both empty and existing drafts. Existing text must survive and no SMS must be sent until you separately select a SIM and tap Send. Check the 1,600-character draft limit.
+- Check the 10-second cooldown and daily per-install limit. These are best-effort client restrictions, not a billing guarantee.
+- Export/restore a backup: AI opt-in/results/request counters must not be transferred and AI must be disabled after restore. Verify old backups still restore.
+- Verify a production-signed internal build with Play Integrity; debug registration must not be accepted as a release fallback. Confirm all six themes and large-font/keyboard layouts on the full-screen AI page.
