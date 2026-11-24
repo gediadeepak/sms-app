@@ -3,6 +3,7 @@ package com.gediadeepak.smsapp.ui
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
@@ -14,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,6 +30,7 @@ import com.gediadeepak.smsapp.core.*
 internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, onAssistant: (AiTask) -> Unit) {
     val conversation = state.selected ?: return
     val context = LocalContext.current
+    val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     val answer by model.ai.collectAsStateWithLifecycle()
     var field by remember(conversation.id) { mutableStateOf(TextFieldValue(state.draft, TextRange(state.draft.length))) }
     var pasteError by remember(conversation.id) { mutableStateOf<String?>(null) }
@@ -38,10 +41,11 @@ internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, on
     }
     Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 12.dp)) {
         if (state.preferences.aiEnabled && (state.preferences.aiReplies || state.preferences.aiSummaries)) {
+          Column(Modifier.heightIn(max = if (keyboardVisible) 96.dp else 220.dp).verticalScroll(rememberScrollState())) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (state.preferences.aiSummaries) IconButton(onClick = { onAssistant(AiTask.SUMMARY) }) { Icon(Icons.Outlined.Summarize, "Summarize conversation", Modifier.size(20.dp), tint = Forest) }
                 if (state.preferences.aiReplies) Box {
-                    TextButton(onClick = { tones = true }, enabled = !answer.loading) { Text(tone.label, fontSize = 12.sp); Icon(Icons.Outlined.ExpandMore, "Choose AI reply tone", Modifier.size(16.dp)) }
+                    IconButton(onClick = { tones = true }, enabled = !answer.loading) { Icon(Icons.Outlined.Tune, "AI reply tone: ${tone.label}", Modifier.size(20.dp)) }
                     DropdownMenu(expanded = tones, onDismissRequest = { tones = false }) { Tone.entries.forEach { option ->
                         DropdownMenuItem(text = { Text(option.label) }, onClick = { tone = option; tones = false; model.cancelAi() })
                     } }
@@ -65,13 +69,14 @@ internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, on
                 }
                 Text(if (answer.insertedDraft == state.draft) "AI draft added · review and edit before sending" else "Choose a suggestion to add to your draft", fontSize = 10.sp, color = Muted)
             }
+          }
         }
         Surface(shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.padding(10.dp)) {
                 OutlinedTextField(value = field, onValueChange = {
                     if (it.text.length <= ComposerRules.LIMIT) { field = it; model.draft(it.text); pasteError = null }
                     else pasteError = "The draft limit is 1,600 characters. Shorten the text before adding more."
-                }, placeholder = { Text("Write a message…", fontSize = 15.sp) }, modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4,
+                }, placeholder = { Text("Write a message…", fontSize = 15.sp) }, modifier = Modifier.fillMaxWidth(), minLines = if (keyboardVisible) 1 else 2, maxLines = if (keyboardVisible) 3 else 4,
                     colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.Transparent, focusedBorderColor = Color.Transparent), textStyle = MaterialTheme.typography.bodyLarge)
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) { LinePicker(state.sendSubscriptionId, state.subscriptions, state.preferences, model::sendSubscription) }
