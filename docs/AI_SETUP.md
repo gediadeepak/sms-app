@@ -20,7 +20,25 @@ The debug source set installs the App Check debug provider. No debug secret is s
 5. Register the token in **Firebase → Security → App Check → Apps → com.sandesh.app → Manage debug tokens**. Retry the verification button after registration propagates.
 6. Once verification succeeds, enable AI and test generation using only synthetic, non-sensitive messages. Review the text preview before sharing. Verification success alone does not prove the Gemini API, model access, billing or quota are ready.
 
-Tokens are installation-specific. A fresh emulator, cleared application data or a different laptop/phone may require its own registration. The supplied Firebase configuration and OAuth signing fingerprints remain necessary for account sign-in; they do not replace App Check registration.
+By default, tokens are installation-specific. A fresh emulator, cleared application data or a different laptop/phone may require its own registration. The supplied Firebase configuration and OAuth signing fingerprints remain necessary for account sign-in; they do not replace App Check registration.
+
+### Optional private local configuration
+
+To use an already-registered Firebase debug token, create `appcheck-debug.local.properties` in the repository root:
+
+```properties
+appCheck.debugToken=YOUR_REGISTERED_DEBUG_TOKEN
+```
+
+This file is Git-ignored and is not read by Gradle or packaged in an APK. Keep the actual value private. Apply it to a connected, initialized debug installation using PowerShell 7:
+
+```powershell
+.\tools\Set-AppCheckDebugToken.ps1 -AdbPath 'G:\Project\Android\platform-tools\adb.exe'
+```
+
+Use your SDK's actual adb path and optionally `-Serial` when multiple devices are connected. `-WhatIf` validates the configuration and target without updating the phone. The helper stops Sandesh, changes only the existing Firebase debug-secret preference, and verifies the saved value without printing it. Reopen Sandesh and use **Check device verification** afterward. Normal app updates preserve the setting; clearing app data or reinstalling can require applying it again.
+
+This developer utility relies on the inspected preference layout of `firebase-appcheck-debug` 20.1.0. It requires a debuggable installation and fails on release builds or an unrecognized layout. Recheck it when upgrading the SDK. Release builds continue to use Play Integrity. Never add this configuration file or a real token to a commit.
 
 ## Release builds
 

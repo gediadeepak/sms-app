@@ -17,3 +17,4 @@ firestore-debug.log
 ui-debug.log
 dependency-validation.log
 settings-validation.log
+appcheck-debug.local.properties
