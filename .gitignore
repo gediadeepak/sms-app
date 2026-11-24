@@ -9,3 +9,5 @@ captures/
 *.jks
 *.keystore
 build-validation.log
+.codex-attachments/
+release-validation.log

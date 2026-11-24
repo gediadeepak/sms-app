@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "SMS-App"
+rootProject.name = "Sandesh"
 include(":app", ":core")

@@ -36,7 +36,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gediadeepak.smsapp.InboxState
-import com.gediadeepak.smsapp.RelayViewModel
+import com.gediadeepak.smsapp.SandeshViewModel
 import com.gediadeepak.smsapp.core.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -44,14 +44,18 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
-fun RelayApp(model: RelayViewModel) {
+fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings: () -> Unit = {}, onNotifications: () -> Unit = {}) {
     val state by model.state.collectAsStateWithLifecycle()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var newMessage by rememberSaveable { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var assistant by rememberSaveable { mutableStateOf(false) }
-    var reset by rememberSaveable { mutableStateOf(false) }
+    if (state.error != null) AlertDialog(onDismissRequest = model::clearError, title = { Text("Sandesh needs attention") }, text = { Text(state.error.orEmpty()) }, confirmButton = { TextButton(onClick = model::clearError) { Text("OK") } })
+    if (!state.ready) {
+        SmsSetup(state, onSetup, onAppSettings, model::savePreferences)
+        return
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 840.dp
         val desktop = maxWidth >= 1250.dp
@@ -79,7 +83,7 @@ fun RelayApp(model: RelayViewModel) {
                         }, navigationIcon = {
                             if (!desktop) IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Outlined.Menu, "Open navigation") }
                         }, actions = {
-                            Surface(color = Sage, shape = RoundedCornerShape(6.dp)) { Text("Demo", Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = Forest, style = MaterialTheme.typography.labelMedium) }
+                            IconButton(onClick = model::refresh) { Icon(Icons.Outlined.Refresh, "Refresh inbox", tint = Muted) }
                             IconButton(onClick = openSettings) { Icon(Icons.Outlined.Settings, "Settings", tint = Muted) }
                         }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Canvas))
                     }
@@ -87,12 +91,12 @@ fun RelayApp(model: RelayViewModel) {
                 bottomBar = {
                     Row(Modifier.fillMaxWidth().background(Canvas).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Made for two lines.", fontSize = 11.sp, color = Muted)
-                        Text("Demo · no real SMS sent", fontSize = 11.sp, color = Muted)
+                        Text(if (state.loading) "Updating inbox…" else "SMS · on your device", fontSize = 11.sp, color = Muted)
                     }
                 },
             ) { padding ->
                 Row(Modifier.padding(padding).padding(horizontal = if (wide) 20.dp else 12.dp).padding(top = 8.dp).fillMaxSize()
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)).background(Color.White, RoundedCornerShape(16.dp))) {
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))) {
                     if (wide || state.selectedId == null) {
                         Inbox(state, Modifier.then(if (wide) Modifier.width(330.dp) else Modifier.weight(1f)), model::select,
                             model::search, model::filter, startMessage)
@@ -111,18 +115,13 @@ fun RelayApp(model: RelayViewModel) {
         if (desktop) {
             Row(Modifier.fillMaxSize().background(Canvas)) { navigation(); Box(Modifier.weight(1f)) { workspace() } }
         } else {
-            ModalNavigationDrawer(drawerState = drawer, drawerContent = { ModalDrawerSheet(drawerContainerColor = Color(0xFFFAFBF8)) { navigation() } }) { workspace() }
+            ModalNavigationDrawer(drawerState = drawer, drawerContent = { ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow) { navigation() } }) { workspace() }
         }
     }
-    if (newMessage) NewConversationDialog(state.preferences, state.filterLine ?: state.preferences.defaultLine, model::newConversation) { newMessage = false }
-    if (settings) SettingsDialog(state.preferences, onSave = { model.savePreferences(it); settings = false },
-        onIncoming = { model.simulateIncoming(); settings = false }, onReset = { settings = false; reset = true }, onDismiss = { settings = false })
-    if (reset) AlertDialog(onDismissRequest = { reset = false }, title = { Text("Start fresh?") },
-        text = { Text("Remove your local demo messages and restore the sample inbox?") },
-        confirmButton = { TextButton(onClick = { model.reset(); reset = false }) { Text("Reset demo") } },
-        dismissButton = { TextButton(onClick = { reset = false }) { Text("Keep messages") } })
+    if (newMessage) NewConversationDialog(state, { name, number, id -> model.newConversation(name, number, id) }) { newMessage = false }
+    if (settings) SettingsDialog(state, onSave = { model.savePreferences(it); settings = false }, onNotifications = onNotifications, onAppSettings = onAppSettings, onDismiss = { settings = false })
     if (assistant && state.selected != null && state.preferences.suggestions) Dialog(onDismissRequest = { assistant = false }) {
-        Surface(shape = RoundedCornerShape(20.dp), color = Color(0xFFFAFBF7)) {
+        Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Assistant(state, model, Modifier.fillMaxWidth().heightIn(max = 650.dp), onDismiss = { assistant = false }, onInsert = { assistant = false })
         }
     }
@@ -130,11 +129,11 @@ fun RelayApp(model: RelayViewModel) {
 
 @Composable
 private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimLine?) -> Unit, onNew: () -> Unit, onSettings: () -> Unit) {
-    Column(Modifier.width(235.dp).fillMaxHeight().background(Color(0xFFFAFBF8)).statusBarsPadding().navigationBarsPadding()
+    Column(Modifier.width(235.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow).statusBarsPadding().navigationBarsPadding()
         .padding(20.dp).verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
-            Surface(color = Forest, shape = RoundedCornerShape(10.dp)) { Icon(Icons.Outlined.Sms, null, tint = Color.White, modifier = Modifier.padding(8.dp).size(23.dp)) }
-            Spacer(Modifier.width(10.dp)); Text("relay.", fontSize = 34.sp, fontWeight = FontWeight.Bold, letterSpacing = (-2).sp)
+            SandeshLogo(Modifier.size(42.dp))
+            Spacer(Modifier.width(10.dp)); Text("sandesh.", fontSize = 29.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
         }
         Text("YOUR EVERYDAY, CONNECTED", fontSize = 9.sp, letterSpacing = 1.sp, color = Muted, modifier = Modifier.padding(top = 16.dp, bottom = 25.dp))
         Button(onClick = onNew, shape = RoundedCornerShape(9.dp), modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(6.dp)); Text("New message") }
@@ -150,21 +149,23 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
             }
         }
         Text("YOUR LINES", fontSize = 11.sp, color = Muted, letterSpacing = 1.sp, modifier = Modifier.padding(top = 30.dp, bottom = 14.dp))
-        SimLine.entries.forEach { line ->
-            Surface(onClick = { onLine(line) }, shape = RoundedCornerShape(10.dp), color = Color.White,
+        state.subscriptions.forEach { sim ->
+            val line = sim.line
+            Surface(onClick = { onLine(line) }, shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surface,
                 border = androidx.compose.foundation.BorderStroke(1.dp, if (state.filterLine == line) Forest else MaterialTheme.colorScheme.outlineVariant), modifier = Modifier.padding(bottom = 10.dp).fillMaxWidth()) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.SimCard, null, tint = lineColor(line), modifier = Modifier.size(22.dp)); Spacer(Modifier.width(10.dp))
-                    Column { Text(state.preferences.label(line), fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis); Text("•••• ${if (line == SimLine.PERSONAL) "4821" else "0936"} · SIM ${line.slot}", fontSize = 11.sp, color = Muted) }
+                    Column { Text(state.preferences.label(line), fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(sim.label, fontSize = 11.sp, color = Muted, maxLines = 2) }
                 }
             }
         }
+        if (state.subscriptions.isEmpty()) Text("No active SIM detected", fontSize = 13.sp, color = Muted)
         TextButton(onClick = { onLine(null) }) { Text("Show both lines", fontSize = 12.sp, color = Muted) }
         Spacer(Modifier.height(30.dp))
         Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Lock, null, Modifier.size(15.dp), tint = Muted); Spacer(Modifier.width(8.dp)); Text("Your conversations stay\non this device.", color = Muted, fontSize = 11.sp) }
         TextButton(onClick = onSettings, modifier = Modifier.padding(top = 16.dp)) { Icon(Icons.Outlined.Settings, null, Modifier.size(18.dp)); Spacer(Modifier.width(10.dp)); Text("Settings") }
         HorizontalDivider(Modifier.padding(vertical = 12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) { Avatar("DP", "Deepak"); Spacer(Modifier.width(10.dp)); Column { Text("Deepak", fontSize = 14.sp, fontWeight = FontWeight.Medium); Text("Personal workspace", fontSize = 11.sp, color = Muted) } }
+        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Sms, null, tint = Forest); Spacer(Modifier.width(10.dp)); Column { Text("Sandesh", fontSize = 14.sp, fontWeight = FontWeight.Medium); Text("On-device SMS", fontSize = 11.sp, color = Muted) } }
     }
 }
 
@@ -178,12 +179,13 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
         OutlinedTextField(value = state.query, onValueChange = onSearch, placeholder = { Text("Search conversations", fontSize = 14.sp) },
             leadingIcon = { Icon(Icons.Outlined.Search, null, Modifier.size(20.dp)) }, singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), shape = RoundedCornerShape(9.dp),
-            colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = Color(0xFFF7F8F5), unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant))
+            colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow, unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant))
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             LineFilter("All lines", state.filterLine == null) { onFilter(null) }
-            SimLine.entries.forEach { line -> LineFilter(state.preferences.label(line), state.filterLine == line, line) { onFilter(line) } }
+            state.subscriptions.map { it.line }.distinct().forEach { line -> LineFilter(state.preferences.label(line), state.filterLine == line, line) { onFilter(line) } }
         }
         Row(Modifier.padding(horizontal = 22.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("CONVERSATIONS", color = Muted, fontSize = 10.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f)); Text(state.visible.size.toString().padStart(2, '0'), color = Muted, fontSize = 11.sp) }
+        if (state.pendingMms > 0) Text("MMS received: attachments are unavailable. See Settings.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
         if (state.visible.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(if (state.query.isNotBlank()) "No matching conversations." else "A little space for new conversations.", Modifier.padding(24.dp), color = Muted, fontSize = 14.sp) }
         else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 9.dp)) {
             items(state.visible, key = { it.id }) { c ->
@@ -216,7 +218,7 @@ private fun LineFilter(label: String, selected: Boolean, line: SimLine? = null, 
 
 @Composable
 private fun ConversationHeader(c: Conversation, onBack: (() -> Unit)?, onStar: () -> Unit, onArchive: () -> Unit, onAssistant: (() -> Unit)?) {
-    Surface(color = Color.White) {
+    Surface(color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.fillMaxWidth().then(if (onBack != null) Modifier.statusBarsPadding() else Modifier).padding(horizontal = 6.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to inbox", tint = Muted) }
             else Spacer(Modifier.width(14.dp))
@@ -230,7 +232,7 @@ private fun ConversationHeader(c: Conversation, onBack: (() -> Unit)?, onStar: (
 }
 
 @Composable
-private fun Thread(state: InboxState, modifier: Modifier, model: RelayViewModel, showHeader: Boolean, onAssistant: () -> Unit) {
+private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewModel, showHeader: Boolean, onAssistant: () -> Unit) {
     val c = state.selected
     if (c == null) {
         Box(modifier.fillMaxHeight(), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(30.dp)) { Icon(Icons.Outlined.Forum, null, Modifier.size(48.dp), tint = Forest); Text("Make a little connection.", fontSize = 22.sp, modifier = Modifier.padding(top = 20.dp)); Text("Choose a conversation to get started.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp)) } }
@@ -241,7 +243,7 @@ private fun Thread(state: InboxState, modifier: Modifier, model: RelayViewModel,
     Column(modifier.fillMaxHeight()) {
         if (showHeader) ConversationHeader(c, null, model::star, model::archive, if (state.preferences.suggestions) onAssistant else null)
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Row(Modifier.fillMaxWidth().background(Color(0xFFFAFCF7)).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.SimCard, null, Modifier.size(14.dp), tint = Muted); Spacer(Modifier.width(7.dp)); Text("Conversation on", color = Muted, fontSize = 11.sp); Spacer(Modifier.width(8.dp)); LineBadge(c.line, state.preferences)
         }
         LazyColumn(state = scroll, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(19.dp)) {
@@ -264,25 +266,26 @@ private fun Thread(state: InboxState, modifier: Modifier, model: RelayViewModel,
                 Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.AutoAwesome, null, Modifier.size(14.dp), tint = Muted); Spacer(Modifier.width(6.dp)); Text("A little help replying", fontSize = 11.sp, color = Muted) }
                 TextButton(onClick = onAssistant) { Text("Show suggestions", fontSize = 11.sp) }
             }
-            Surface(shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), color = Color.White) {
+            Surface(shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), color = MaterialTheme.colorScheme.surface) {
                 Column(Modifier.padding(12.dp)) {
                     OutlinedTextField(value = state.draft, onValueChange = model::draft, placeholder = { Text("Write something thoughtful…", fontSize = 15.sp) },
                         modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4,
                         colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.Transparent, focusedBorderColor = Color.Transparent),
                         textStyle = MaterialTheme.typography.bodyLarge)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        LinePicker(state.sendLine, state.preferences, model::sendLine)
+                        LinePicker(state.sendSubscriptionId, state.subscriptions, state.preferences, model::sendSubscription)
                         Spacer(Modifier.weight(1f))
                         if (state.preferences.suggestions) IconButton(onClick = model::polishDraft, enabled = state.draft.isNotBlank(), modifier = Modifier.size(36.dp)) {
                             Icon(Icons.Outlined.AutoAwesome, "Tidy draft with local rules", modifier = Modifier.size(18.dp), tint = Muted)
                         }
-                        Button(onClick = model::send, enabled = state.draft.isNotBlank(), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)) {
+                        Button(onClick = model::send, enabled = state.draft.isNotBlank() && state.canSend, shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)) {
                             Text("Send", fontSize = 14.sp); Spacer(Modifier.width(8.dp)); Icon(Icons.AutoMirrored.Outlined.Send, null, Modifier.size(16.dp))
                         }
                     }
                 }
             }
             Text("SMS · ${state.draft.length} characters", fontSize = 10.sp, color = Muted, modifier = Modifier.padding(top = 8.dp))
+            if (state.sendSubscriptionId == null) Text(if (state.subscriptions.isEmpty()) "Insert or enable a SIM to send SMS." else "Choose a sending SIM above. Set a default in Settings.", fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 5.dp))
         }
     }
 }
@@ -291,22 +294,22 @@ private fun Thread(state: InboxState, modifier: Modifier, model: RelayViewModel,
 private fun MessageBubble(message: Message, preferences: Preferences) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = if (message.outgoing) Alignment.End else Alignment.Start) {
         Surface(shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomEnd = if (message.outgoing) 3.dp else 14.dp, bottomStart = if (message.outgoing) 14.dp else 3.dp),
-            color = if (message.outgoing) Color(0xFFE5EEE2) else Color(0xFFF1F3EE), modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(.9f)) {
-            Text(message.text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp), fontSize = 16.sp, lineHeight = 26.sp, color = if (message.outgoing) Color(0xFF365633) else Color(0xFF52634B))
+            color = if (message.outgoing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(.9f)) {
+            Text(message.text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp), fontSize = 16.sp, lineHeight = 26.sp, color = if (message.outgoing) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
         }
         Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("${clock(message.timestamp)} · ${preferences.label(message.line)}", fontSize = 10.sp, color = Muted)
-            if (message.outgoing) { Spacer(Modifier.width(5.dp)); Icon(if (message.delivery == Delivery.DELIVERED) Icons.Outlined.DoneAll else Icons.Outlined.Done, null, Modifier.size(12.dp), tint = Muted); Spacer(Modifier.width(3.dp)); Text(when (message.delivery) { Delivery.SENDING -> "Sending…"; Delivery.SENT -> "Sent"; else -> "Delivered" }, fontSize = 10.sp, color = Muted) }
+            if (message.outgoing) { Spacer(Modifier.width(5.dp)); Icon(if (message.delivery == Delivery.DELIVERED) Icons.Outlined.DoneAll else if (message.delivery == Delivery.FAILED || message.delivery == Delivery.UNDELIVERED) Icons.Outlined.ErrorOutline else Icons.Outlined.Done, null, Modifier.size(12.dp), tint = Muted); Spacer(Modifier.width(3.dp)); Text(when (message.delivery) { Delivery.SENDING -> "Sending…"; Delivery.SENT -> "Sent"; Delivery.DELIVERED -> "Delivered"; Delivery.FAILED -> "Send failed · check before retrying"; Delivery.UNDELIVERED -> "Not delivered"; else -> "Status unknown" }, fontSize = 10.sp, color = if (message.delivery == Delivery.FAILED || message.delivery == Delivery.UNDELIVERED) MaterialTheme.colorScheme.error else Muted) }
         }
     }
 }
 
 @Composable
-private fun Assistant(state: InboxState, model: RelayViewModel, modifier: Modifier, onDismiss: (() -> Unit)? = null, onInsert: () -> Unit = {}) {
+private fun Assistant(state: InboxState, model: SandeshViewModel, modifier: Modifier, onDismiss: (() -> Unit)? = null, onInsert: () -> Unit = {}) {
     var tone by rememberSaveable { mutableStateOf(Tone.FRIENDLY) }
     var summary by rememberSaveable { mutableStateOf(false) }
     var ideaOffset by rememberSaveable { mutableIntStateOf(0) }
-    Column(modifier.fillMaxHeight().background(Color(0xFFFAFBF7)).verticalScroll(rememberScrollState()).padding(20.dp)) {
+    Column(modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow).verticalScroll(rememberScrollState()).padding(20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.AutoAwesome, null, Modifier.size(22.dp), tint = Forest); Spacer(Modifier.width(10.dp))
             Text("A little assistance", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -338,9 +341,9 @@ private fun Assistant(state: InboxState, model: RelayViewModel, modifier: Modifi
             val replies = model.assistant.suggest(c, tone)
             val rotated = replies.indices.map { replies[(it + ideaOffset) % replies.size] }
             rotated.forEachIndexed { index, text ->
-                Surface(onClick = { model.draft(text); onInsert() }, shape = RoundedCornerShape(10.dp), color = Color.White,
+                Surface(onClick = { model.draft(text); onInsert() }, shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surface,
                     border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-                    Column(Modifier.padding(14.dp)) { Text(listOf("KEEP IT NATURAL", "ANOTHER WAY TO SAY IT", "A LITTLE DIFFERENT")[index], fontSize = 9.sp, letterSpacing = 1.sp, color = Muted); Text(text, fontSize = 15.sp, lineHeight = 24.sp, color = Color(0xFF5D7050), modifier = Modifier.padding(vertical = 8.dp)); Text("Use this reply", color = Forest, fontSize = 12.sp) }
+                    Column(Modifier.padding(14.dp)) { Text(listOf("KEEP IT NATURAL", "ANOTHER WAY TO SAY IT", "A LITTLE DIFFERENT")[index], fontSize = 9.sp, letterSpacing = 1.sp, color = Muted); Text(text, fontSize = 15.sp, lineHeight = 24.sp, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(vertical = 8.dp)); Text("Use this reply", color = Forest, fontSize = 12.sp) }
                 }
             }
             OutlinedButton(onClick = { ideaOffset = (ideaOffset + 1) % replies.size }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp)) {
@@ -354,58 +357,10 @@ private fun Assistant(state: InboxState, model: RelayViewModel, modifier: Modifi
 }
 
 @Composable
-private fun LinePicker(selected: SimLine, preferences: Preferences, onSelect: (SimLine) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        Surface(onClick = { expanded = true }, color = if (selected == SimLine.WORK) WorkBackground else Sage, shape = RoundedCornerShape(6.dp)) {
-            Row(Modifier.padding(horizontal = 9.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.SimCard, null, Modifier.size(14.dp), tint = lineColor(selected)); Spacer(Modifier.width(5.dp)); Text("${preferences.label(selected).take(14)} · SIM ${selected.slot}", fontSize = 11.sp, color = lineColor(selected)); Icon(Icons.Outlined.ExpandMore, "Choose sending SIM", Modifier.size(16.dp), tint = lineColor(selected))
-            }
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) { SimLine.entries.forEach { line -> DropdownMenuItem(text = { Text("${preferences.label(line)} · SIM ${line.slot}") }, onClick = { onSelect(line); expanded = false }) } }
-    }
-}
-
-@Composable
-private fun NewConversationDialog(preferences: Preferences, initialLine: SimLine, onCreate: (String, String, SimLine) -> String?, onDismiss: () -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }; var number by rememberSaveable { mutableStateOf("") }
-    var line by rememberSaveable { mutableStateOf(initialLine) }; var error by rememberSaveable { mutableStateOf<String?>(null) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("A simple hello.", fontWeight = FontWeight.SemiBold) },
-        text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("START A CONVERSATION", fontSize = 10.sp, color = Muted, letterSpacing = 1.sp)
-            OutlinedTextField(value = name, onValueChange = { name = it.take(60) }, label = { Text("Name (optional)") }, singleLine = true)
-            OutlinedTextField(value = number, onValueChange = { number = it.take(22); error = null }, label = { Text("Phone number") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), isError = error != null)
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
-            Text("Send from", fontSize = 13.sp, color = Muted); LinePicker(line, preferences) { line = it }
-            Text("Demo conversation. No real number will be contacted.", fontSize = 12.sp, color = Muted)
-        } }, confirmButton = { Button(onClick = { error = onCreate(name, number, line); if (error == null) onDismiss() }) { Text("Start conversation") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
-}
-
-@Composable
-private fun SettingsDialog(preferences: Preferences, onSave: (Preferences) -> Unit, onIncoming: () -> Unit, onReset: () -> Unit, onDismiss: () -> Unit) {
-    var personal by rememberSaveable { mutableStateOf(preferences.personalLabel) }; var work by rememberSaveable { mutableStateOf(preferences.workLabel) }
-    var defaultLine by rememberSaveable { mutableStateOf(preferences.defaultLine) }; var suggestions by rememberSaveable { mutableStateOf(preferences.suggestions) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Your workspace.", fontWeight = FontWeight.SemiBold) }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("MAKE YOURSELF AT HOME", fontSize = 10.sp, color = Muted, letterSpacing = 1.sp)
-            OutlinedTextField(value = personal, onValueChange = { personal = it.take(18) }, label = { Text("SIM 1 label") }, singleLine = true)
-            OutlinedTextField(value = work, onValueChange = { work = it.take(18) }, label = { Text("SIM 2 label") }, singleLine = true)
-            Text("Default line for new conversations", fontSize = 13.sp, color = Muted)
-            LinePicker(defaultLine, preferences.copy(personalLabel = personal, workLabel = work)) { defaultLine = it }
-            Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("Reply suggestions", fontSize = 14.sp); Text("Offline demo assistant", fontSize = 12.sp, color = Muted) }; Switch(checked = suggestions, onCheckedChange = { suggestions = it }) }
-            HorizontalDivider(); Text("PROTOTYPE TOOLS", fontSize = 10.sp, color = Muted, letterSpacing = 1.sp)
-            OutlinedButton(onClick = onIncoming, modifier = Modifier.fillMaxWidth()) { Text("Simulate incoming message", fontSize = 12.sp) }
-            TextButton(onClick = onReset, modifier = Modifier.fillMaxWidth()) { Text("Reset demo conversations", color = Work, fontSize = 12.sp) }
-            Text("SIMs are demo lines. This version does not access your phone’s SMS inbox or send real SMS.", fontSize = 12.sp, lineHeight = 20.sp, color = Muted)
-        }
-    }, confirmButton = { Button(onClick = { onSave(Preferences(personal.trim(), work.trim(), defaultLine, suggestions)) }, enabled = personal.isNotBlank() && work.isNotBlank()) { Text("Save preferences") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } })
-}
-
-@Composable
 private fun Avatar(initials: String, name: String, small: Boolean = false) {
     val palettes = listOf(Color(0xFFE8D6C9) to Color(0xFF96705A), Color(0xFFD9E2EE) to Color(0xFF6B82A1), Color(0xFFE9DCE8) to Color(0xFFA17F9D), Color(0xFFD5E5DC) to Color(0xFF779B84))
     val index = when (name) { "Maya Patel" -> 0; "Alex Morgan" -> 1; "Mum" -> 2; "Studio North" -> 3; else -> (name.hashCode().toLong().let { if (it < 0) -it else it } % palettes.size).toInt() }
-    val colors = palettes[index]
+    val colors = if (MaterialTheme.colorScheme.background == Color.Black) Color(0xFF303030) to Color.White else palettes[index]
     Box(Modifier.size(if (small) 36.dp else 42.dp).background(colors.first, CircleShape), contentAlignment = Alignment.Center) { Text(initials.take(2), color = colors.second, fontSize = 12.sp, fontWeight = FontWeight.Medium) }
 }
 
@@ -416,7 +371,8 @@ private fun LineBadge(line: SimLine, preferences: Preferences) {
     }
 }
 
-private fun lineColor(line: SimLine) = if (line == SimLine.WORK) Work else Forest
+@Composable
+private fun lineColor(line: SimLine) = if (line == SimLine.WORK) Work else if (line == SimLine.UNKNOWN) Muted else Forest
 private fun clock(timestamp: Long): String = SimpleDateFormat("HH:mm", Locale.UK).format(Date(timestamp))
 private fun listTime(timestamp: Long): String {
     val date = SimpleDateFormat("yyyyMMdd", Locale.UK)
@@ -433,5 +389,5 @@ private fun day(timestamp: Long): String {
 @Preview(showBackground = true, widthDp = 390, heightDp = 800)
 @Composable
 private fun InboxPreview() {
-    RelayTheme { Inbox(InboxState(DemoData.conversations(System.currentTimeMillis()), Preferences()), Modifier.fillMaxWidth(), {}, {}, {}, {}) }
+    SandeshTheme { Inbox(InboxState(DemoData.conversations(System.currentTimeMillis()), Preferences()), Modifier.fillMaxWidth(), {}, {}, {}, {}) }
 }

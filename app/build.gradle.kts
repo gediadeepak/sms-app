@@ -10,8 +10,8 @@ android {
         applicationId = "com.gediadeepak.smsapp"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -19,7 +19,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+    val signingValues = listOf("SANDESH_KEYSTORE_FILE", "SANDESH_KEYSTORE_PASSWORD", "SANDESH_KEY_ALIAS", "SANDESH_KEY_PASSWORD").associateWith { providers.environmentVariable(it).orNull }
+    if (signingValues.values.all { !it.isNullOrBlank() }) {
+        val releaseKey = signingConfigs.create("releaseKey") {
+            storeFile = file(signingValues.getValue("SANDESH_KEYSTORE_FILE")!!)
+            storePassword = signingValues.getValue("SANDESH_KEYSTORE_PASSWORD")
+            keyAlias = signingValues.getValue("SANDESH_KEY_ALIAS")
+            keyPassword = signingValues.getValue("SANDESH_KEY_PASSWORD")
+        }
+        buildTypes.getByName("release").signingConfig = releaseKey
     }
 }
 

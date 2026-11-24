@@ -13,4 +13,4 @@ const server = http.createServer((req,res) => {
     res.end(req.method === 'HEAD' ? undefined : data);
   });
 });
-server.listen(4173,'127.0.0.1',() => console.log('Relay prototype: http://127.0.0.1:4173'));
+server.listen(4173,'127.0.0.1',() => console.log('Sandesh prototype: http://127.0.0.1:4173'));

@@ -1,8 +1,13 @@
 package com.gediadeepak.smsapp.core
 
-enum class SimLine(val defaultLabel: String, val slot: Int) { PERSONAL("Personal", 1), WORK("Work", 2) }
+enum class SimLine(val defaultLabel: String, val slot: Int) { PERSONAL("Personal", 1), WORK("Work", 2), UNKNOWN("Unknown SIM", 0) }
 enum class Folder(val label: String) { INBOX("Inbox"), UNREAD("Unread"), STARRED("Starred"), ARCHIVED("Archived") }
-enum class Delivery { RECEIVED, SENDING, SENT, DELIVERED }
+enum class Delivery { RECEIVED, SENDING, SENT, DELIVERED, FAILED, UNDELIVERED, UNKNOWN }
+enum class ThemeMode(val label: String) { BLUE("Blue & white"), GREEN("Green & white"), DARK("Black & white") }
+data class DeviceSim(val subscriptionId: Int, val slotIndex: Int, val displayName: String, val carrier: String) {
+    val line get() = when (slotIndex) { 0 -> SimLine.PERSONAL; 1 -> SimLine.WORK; else -> SimLine.UNKNOWN }
+    val label get() = "SIM ${slotIndex + 1} · $displayName"
+}
 enum class Tone(val label: String) { FRIENDLY("Friendly"), CONCISE("Short"), PROFESSIONAL("Professional") }
 
 data class Message(
@@ -12,6 +17,7 @@ data class Message(
     val timestamp: Long,
     val line: SimLine,
     val delivery: Delivery = if (outgoing) Delivery.DELIVERED else Delivery.RECEIVED,
+    val subscriptionId: Int? = null,
 )
 
 data class Conversation(
@@ -24,6 +30,7 @@ data class Conversation(
     val starred: Boolean = false,
     val archived: Boolean = false,
     val topic: String = "general",
+    val subscriptionId: Int? = null,
 ) {
     val initials: String get() = name.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
 }
@@ -31,10 +38,25 @@ data class Conversation(
 data class Preferences(
     val personalLabel: String = "Personal",
     val workLabel: String = "Work",
-    val defaultLine: SimLine = SimLine.PERSONAL,
     val suggestions: Boolean = true,
+    val theme: ThemeMode = ThemeMode.BLUE,
+    val defaultSubscriptionId: Int? = null,
 ) {
-    fun label(line: SimLine): String = if (line == SimLine.PERSONAL) personalLabel else workLabel
+    fun label(line: SimLine): String = when (line) { SimLine.PERSONAL -> personalLabel; SimLine.WORK -> workLabel; SimLine.UNKNOWN -> "Unknown SIM" }
+}
+
+/** Never substitute a different SIM when a saved subscription disappears. */
+fun resolveSendingSubscription(defaultId: Int?, activeIds: List<Int>): Int? =
+    if (defaultId != null) defaultId.takeIf { it in activeIds } else activeIds.singleOrNull()
+
+data class PartResult(val sent: Int = 0, val delivered: Int = 0)
+fun aggregateDelivery(parts: List<PartResult>): Delivery = when {
+    parts.isEmpty() -> Delivery.UNKNOWN
+    parts.any { it.sent < 0 } -> Delivery.FAILED
+    parts.all { it.delivered > 0 } -> Delivery.DELIVERED
+    parts.any { it.delivered < 0 } -> Delivery.UNDELIVERED
+    parts.all { it.sent > 0 } -> Delivery.SENT
+    else -> Delivery.SENDING
 }
 
 fun filterConversations(items: List<Conversation>, folder: Folder, line: SimLine?, query: String): List<Conversation> {

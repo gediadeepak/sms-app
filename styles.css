@@ -24,3 +24,4 @@
 .sidebar{overflow-y:auto;scrollbar-width:thin;scrollbar-color:#dae3d4 transparent}.sidebar>*{flex-shrink:0}
 @media(max-height:800px){.sidebar{padding-top:23px}.workspace-label{margin-top:13px;margin-bottom:22px}.navigation{margin-top:20px;margin-bottom:22px;gap:3px}.line-card{padding-top:10px;padding-bottom:10px}.sidebar-bottom{padding-top:12px}.quiet-note{display:none}.profile{padding:12px 0;margin-top:7px}.workspace-header{height:103px}.assistant-open .assistant-panel{top:104px}}
 @media(max-width:760px){.workspace-header .eyebrow{display:none}.workspace-header h1{margin-top:0}.page-heading .mobile-menu{top:0}.thread-open .assistant-panel{top:88px}.sidebar:not(:hover){scrollbar-width:none}}
+.brand{font-size:30px;letter-spacing:-1.5px}

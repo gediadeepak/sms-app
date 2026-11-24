@@ -1,82 +1,68 @@
-# Relay — native Android app and HTML prototype
+# Sandesh
 
-## Android Studio project
+Native Kotlin/Jetpack Compose SMS app, with an HTML design prototype kept as a reference.
 
-Open **this repository root (`G:\Project\SMS-App`)** in Android Studio using **File → Open**. Wait for Gradle sync, choose the **app** run configuration, select an emulator or Android phone running Android 7.0/API 24 or newer, then press Run.
+## Open and build
 
-The native app is written in **Kotlin and Jetpack Compose**, using the Relay HTML prototype as the visual reference. It includes the sage/green palette, inbox and conversation layouts, per-message SIM badges, settings, starred/archived/unread folders, search, new conversations and the offline assistant. Phones show one screen at a time; wider windows show inbox and thread together, with a persistent assistant on large screens.
-
-**This first Android milestone is an offline demo.** It uses sample SIM labels and fictional numbers. It does not send real SMS, read the system SMS database, request phone/SMS permissions, or call an AI provider. The send/delivery indicators are simulated. Messages and preferences persist locally in app-private storage. Drafts survive activity rotation but not process death. Uninstalling the app or resetting demo data removes the local inbox. Android backup is disabled for this demo.
-
-### Build requirements
-
-- Android Studio with its embedded JDK (the installed JDK 25 is supported by Gradle 9.6).
-- Android SDK Platform 37 and Build Tools 36.0.0.
-- Gradle 9.6.0 via the checked-in wrapper; Android Gradle Plugin 9.5.1.
-- Kotlin/Compose compiler 2.2.10, matching the Kotlin bundled with this AGP; Compose BOM 2025.08.01.
-- Internet access for the initial dependency download.
-
-Your local SDK location is written to **ignored** `local.properties`. Other machines should let Android Studio generate that file. Set Android Studio's **Gradle JDK** to its embedded JDK if prompted. A separate global Gradle or Java installation is unnecessary.
-
-On Windows PowerShell:
+Open the repository root in Android Studio, let Gradle sync, select **app**, and run on an Android phone (API 24+).
 
 ```powershell
 $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
-.\gradlew.bat :app:assembleDebug :core:test :app:lintDebug
+.\gradlew.bat :app:assembleDebug :app:assembleRelease :app:bundleRelease :core:test :app:lintDebug :app:lintRelease
 ```
 
-Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
+Pinned toolchain: Gradle 9.6.0, AGP 9.5.1, Kotlin 2.2.10, Compose BOM 2025.08.01, Android SDK 37 and Build Tools 36.0.0. The SDK path belongs in ignored `local.properties`; Android Studio creates this per machine. The installed Android Studio JDK can run the build.
 
-### Native architecture
+Outputs:
 
-- `app/`: Compose UI, ViewModel, local Android persistence and the launcher activity.
-- `core/`: Android-independent Kotlin models, filtering/validation rules, sample inbox and the `ReplyAssistant` interface, with JVM unit tests.
-- `gradle/`: pinned dependencies and the Gradle wrapper.
+- Installable debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
+- Optimized release APK: `app/build/outputs/apk/release/app-release-unsigned.apk` when no signing key is configured.
+- Release bundle: `app/build/outputs/bundle/release/app-release.aab` (unsigned without a configured key).
 
-`core` is currently a Kotlin/JVM module, **not yet Kotlin Multiplatform**. Its source avoids Android APIs so the business logic can be migrated into KMP common code when iOS work begins. iOS targets, SwiftUI and Xcode setup are not included in this Android milestone.
+Release signing uses environment variables; see [release preparation](docs/RELEASE.md). Never publish a debug-signed build.
 
-### Next native milestones
+## What is implemented
 
-1. Implement the Android default-SMS role and permission flow, plus a platform subscription adapter for actual SIMs/eSIMs.
-2. Implement inbox-provider integration, receiving, notification channels and subscription-specific sending with real result callbacks.
-3. Replace the small demo JSON store with Room for production inbox state and add physical dual-SIM device coverage.
-4. Add an authenticated backend for optional AI, with explicit sharing controls; keep provider secrets off the phone.
-5. Extract the common domain code into Kotlin Multiplatform and implement the permitted iOS experience.
+- Android default-SMS role onboarding, followed by SMS/SIM permission requests.
+- Real SMS inbox from Android's system SMS provider, including unread state and per-message subscription IDs.
+- Actual active SIM/eSIM detection. **Settings → Default sending SIM** supports a specific active SIM or **Ask every time**. The composer always shows the selected line. With multiple SIMs and no default, choose before every send. A removed saved SIM never silently falls back to another line.
+- Real subscription-specific multipart SMS submission, persistent per-part result tracking, incoming SMS persistence and notifications. “Delivered” requires carrier delivery reports; it is never simulated. No automatic retries.
+- SQLite app database for starred/archived flags, aliases, send-part receipts and pending incoming SMS. Actual SMS remains in Android's system store.
+- Three saved themes: **Blue & white** (default), **Green & white**, and **Black & white**.
+- A theme-tinted, transparent winged-envelope-and-hand logo, adaptive launcher icon and the supplied flying GIF as the splash. The supporting hand, envelope and animated wordmark are preserved. Playback follows Android's animation-duration setting.
+- Search, unread/starred/archived folders, drafts during the current app process, external `sms:`/`smsto:` compose intents and optional offline reply examples.
 
-## Original HTML prototype
+## First launch
 
-A responsive, local prototype for the dual-SIM SMS app. Built with HTML, CSS and JavaScript; no build step, package installation or API keys required.
+1. Read the SMS-only limitations on setup before changing your default app.
+2. Choose Sandesh as the default SMS app, then grant SMS and phone-state access.
+3. In Settings, enable notifications and choose a default sending SIM or Ask every time.
+4. Choose your appearance. Messages stay local; there is no AI API connection.
 
-## Open it
+No seeded conversations are loaded by the Android app. Upgrading the earlier prototype retains the same application ID; its old sample JSON is not imported into the real inbox. Uninstalling Sandesh removes app metadata, but does not delete SMS held by Android's system SMS provider.
 
-Open `index.html` in a modern browser, or run `node server.cjs` and visit http://127.0.0.1:4173.
+## Important current limits
 
-## Try it
+**This is a release candidate for physical-device testing, not a certified production release.** The build and unit tests do not establish carrier delivery or OEM behaviour.
 
-- Open a conversation and send a demo SMS using either SIM.
-- Filter by personal/work line, search names, numbers or message text, and browse unread, starred and archived conversations.
-- Star or archive a conversation; restore it from Archived.
-- Start a conversation with **New message** (`N`). Focus search with `/`.
-- Open the sample assistant, choose a tone, insert a reply, or view a local conversation recap.
-- Use the sparkle beside Send to tidy your draft using simple local rules.
-- Rename SIMs, choose a default line or disable suggestions in Settings.
-- Use Settings → Simulate an incoming message to exercise unread states.
-- Reload to keep your messages and preferences. Settings → Reset demo conversations restores sample data.
-- On a phone, select a conversation to open its thread and use Back to return to the inbox.
+- **SMS only. MMS attachment downloading/display, group MMS and RCS are not implemented.** Making Sandesh default can affect those features. MMS notification PDUs are retained and an explicit unsupported-MMS notification/banner is shown; attachments are not retrieved. Keep your previous messaging app installed.
+- No cloud/export backup or restore yet. Android app backup/device transfer is excluded. SQLite is app-private storage, not separately password-encrypted.
+- No contacts permission or automatic contact-name lookup; existing conversations show phone numbers, with optional aliases for conversations you create.
+- AI replies remain clearly labelled offline sample text; draft tidying is local text rules, and summaries are local recaps.
+- Unknown/removed historical subscriptions show **Unknown SIM** rather than an invented line.
+- Telecom's “respond via message” service posts a review notification and opens a draft; it does not send silently. Notifications must be enabled for this flow.
+- The current inbox loads SMS history on a background thread; very large inbox performance needs device testing and future paging.
 
-## Prototype boundaries
+See the [physical-device test plan](docs/DEVICE_TEST_PLAN.md), [privacy notes](docs/PRIVACY.md), and [branding and asset prompt](docs/BRANDING.md).
 
-**No real SMS is sent, no phone inbox is accessed and no AI service is connected.** Sending and delivery states are simulated. Reply ideas are preset examples selected by the sample conversation topic and tone. The summary is a local recap and draft polishing uses local rules. New conversations use generic reply ideas.
+## Architecture
 
-Messages and settings are stored in this browser's localStorage, without a server database. Drafts last for the current session. Private browsing or disabled/full browser storage may prevent persistence. Serving over localhost is preferable for consistent storage behaviour. Opening as a file and opening via localhost use separate storage.
+- `app/.../telephony`: role/permission checks, provider integration, selected-subscription sending, receiving and result notifications.
+- `app/.../data`: SQLite metadata and pending receipts; private settings.
+- `app/.../ui`: Compose screens, three themes, branding and splash.
+- `SandeshViewModel`: inbox state, drafts, provider observation and background work.
+- `core`: Android-independent domain models, SIM selection and multipart-status rules, offline reply interface and unit tests. Currently Kotlin/JVM, not KMP/iOS yet.
 
-The only external resource is optional Google Fonts; system fonts are used if unavailable. There are no external JavaScript dependencies. All sample contact numbers are fictional UK drama-range numbers.
+## HTML reference
 
-Android Studio does not run this HTML prototype as a native Android application. It is a reviewable model of the future app's user experience.
-
-## Files
-
-- `index.html` — app structure, forms and inline SVG icons
-- `styles.css` — responsive desktop/mobile layout
-- `app.js` — demo state, local persistence and interactions
-- `server.cjs` — optional dependency-free localhost preview server
+Open `index.html` in a browser, or run `node server.cjs` and visit http://127.0.0.1:4173. This **browser prototype still uses fictional messages and simulated sending**. It has no access to your phone. The native Android app is the actual SMS implementation.
