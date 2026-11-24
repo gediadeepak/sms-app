@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.gediadeepak.smsapp.ui
 
@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -49,12 +50,13 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
-fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings: () -> Unit = {}, onNotifications: () -> Unit = {}, onAccount: () -> Unit = {}, onBackup: () -> Unit = {}, onTestNotifications: () -> Unit = {}, onReadMessage: (String) -> Unit = {}) {
+fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings: () -> Unit = {}, onNotifications: () -> Unit = {}, onAccount: () -> Unit = {}, onBackup: () -> Unit = {}, onTestNotifications: () -> Unit = {}, onReadMessage: (String) -> Unit = {}, onContacts: () -> Unit = {}) {
     val state by model.state.collectAsStateWithLifecycle()
     val aiAccess by model.aiAccess.collectAsStateWithLifecycle()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var newMessage by rememberSaveable { mutableStateOf(false) }
+    var forwardedId by rememberSaveable { mutableStateOf<String?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
     val settingsStateHolder = rememberSaveableStateHolder()
     var assistant by rememberSaveable { mutableStateOf(false) }
@@ -77,11 +79,21 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
             headsetSettings -> HeadsetSettingsScreen(state.notificationStatus, onNotifications) { headsetSettings = false }
             else -> settingsStateHolder.SaveableStateProvider("settings") {
                 SettingsScreen(state, onSave = model::savePreferences, onNotifications = onNotifications,
-                    onTestNotifications = onTestNotifications, onAppSettings = onAppSettings, aiAccess = aiAccess, onAiCheck = model::checkAiAccess,
+                    onTestNotifications = onTestNotifications, onAppSettings = onAppSettings, aiAccess = aiAccess, onAiCheck = model::checkAiAccess, onContacts = onContacts,
                     onAccount = onAccount, onBackup = onBackup, onBlockedSenders = { blockedSenders = true },
                     onHeadset = { headsetSettings = true }, onDismiss = { settings = false })
             }
         }
+        return
+    }
+    if (newMessage) {
+        val forwarded = forwardedId?.let { id -> state.conversations.asSequence().flatMap { it.messages.asSequence() }.firstOrNull { it.id == id } }
+        RecipientScreen(state, forwarded, forwardedId != null, onContacts, onChoose = { name, number, subscription ->
+            val source = forwardedId
+            val error = if (source != null) model.forwardMessage(source, number, subscription) else model.newConversation(name, number, subscription)
+            if (error == null) { newMessage = false; forwardedId = null }
+            error
+        }, onBack = { newMessage = false; forwardedId = null })
         return
     }
     if (assistant) {
@@ -94,7 +106,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
         val desktop = maxWidth >= 1250.dp
         LaunchedEffect(wide) { if (wide && state.selected == null) state.visible.firstOrNull()?.let { model.select(it.id) } }
         val openSettings = { settings = true; scope.launch { drawer.close() }; Unit }
-        val startMessage = { newMessage = true; scope.launch { drawer.close() }; Unit }
+        val startMessage = { forwardedId = null; newMessage = true; scope.launch { drawer.close() }; Unit }
         BackHandler(enabled = state.selectedId != null && !drawer.isOpen && !newMessage && !settings && !assistant && !blockedSenders && !headsetSettings && spamAction == null) { model.back() }
         val navigation: @Composable () -> Unit = {
             Sidebar(state, onFolder = { model.folder(it); scope.launch { drawer.close() } },
@@ -131,11 +143,11 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))) {
                     if (wide || state.selectedId == null) {
                         Inbox(state, Modifier.then(if (wide) Modifier.width(330.dp) else Modifier.weight(1f)), model::select,
-                            model::search, model::filter, startMessage, compact = !wide, onNotifications = onNotifications)
+                            model::search, model::filter, startMessage, compact = !wide, onNotifications = onNotifications, onContacts = onContacts)
                     }
                     if (wide) VerticalDivider()
                     if (wide || state.selectedId != null) {
-                        Thread(state, Modifier.weight(1f), model, showHeader = wide, onAssistant = { task -> aiStartTask = task; assistant = true }, onSpamAction = { spamAction = it }, onReadMessage = onReadMessage)
+                        Thread(state, Modifier.weight(1f), model, showHeader = wide, onAssistant = { task -> aiStartTask = task; assistant = true }, onSpamAction = { spamAction = it }, onReadMessage = onReadMessage, onForward = { id -> forwardedId = id; newMessage = true })
                     }
 
                 }
@@ -148,13 +160,12 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
         }
     }
     }
-    if (newMessage) NewConversationDialog(state, { name, number, id -> model.newConversation(name, number, id) }) { newMessage = false }
     if (spamAction != null && state.selected != null) {
         val action = spamAction!!
         val restoring = action == "restore"
         AlertDialog(onDismissRequest = { spamAction = null }, title = { Text(if (restoring) "Move to inbox?" else if (action == "block") "Block this sender?" else "Move to Spam?") },
-            text = { Text(if (restoring) "${state.selected!!.name} will return to your inbox. If blocked, this sender will also be unblocked. No messages will be deleted."
-                else if (action == "block") "SMS from ${state.selected!!.name} will be kept silently in Spam inside Sandesh. Existing messages are preserved. Calls and other apps are unaffected."
+            text = { Text(if (restoring) "${state.selected!!.displayName} will return to your inbox. If blocked, this sender will also be unblocked. No messages will be deleted."
+                else if (action == "block") "SMS from ${state.selected!!.displayName} will be kept silently in Spam inside Sandesh. Existing messages are preserved. Calls and other apps are unaffected."
                 else "This conversation will move to Spam and future SMS in it will be silent. You can restore it from Spam at any time.") },
             confirmButton = { Button(onClick = { spamAction = null; if (restoring) model.restoreFromSpam() else model.moveToSpam(action == "block") }) { Text(if (restoring) "Move to inbox" else if (action == "block") "Block sender" else "Move to Spam") } },
             dismissButton = { TextButton(onClick = { spamAction = null }) { Text("Cancel") } })
@@ -206,7 +217,7 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
 }
 
 @Composable
-private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> Unit, onSearch: (String) -> Unit, onFilter: (SimLine?) -> Unit, onNew: () -> Unit, compact: Boolean = true, onNotifications: () -> Unit = {}) {
+private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> Unit, onSearch: (String) -> Unit, onFilter: (SimLine?) -> Unit, onNew: () -> Unit, compact: Boolean = true, onNotifications: () -> Unit = {}, onContacts: () -> Unit = {}) {
     Column(modifier.fillMaxHeight()) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -231,6 +242,7 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
                 TextButton(onClick = onNotifications) { Text("Enable", fontSize = 12.sp) }
             }
         }
+        if (!state.contactsGranted) TextButton(onClick = onContacts, modifier = Modifier.fillMaxWidth()) { Text("Show contact names", fontSize = 12.sp) }
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (state.pendingMms > 0) Text("MMS received: attachments are unavailable. See Settings.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
         if (state.visible.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(if (state.query.isNotBlank()) "No matching conversations." else "A little space for new conversations.", Modifier.padding(24.dp), color = Muted, fontSize = 14.sp) }
@@ -239,10 +251,10 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
                 val last = c.messages.lastOrNull()
                 Row(Modifier.fillMaxWidth().background(if (c.id == state.selectedId) Sage else Color.Transparent, RoundedCornerShape(10.dp))
                     .clickable { onSelect(c.id) }.padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.Top) {
-                    Avatar(c.initials, c.name); Spacer(Modifier.width(11.dp))
+                    Avatar(c.initials, c.displayName); Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(c.name, fontSize = 15.sp, fontWeight = if (c.unread > 0) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(c.displayName, fontSize = 15.sp, fontWeight = if (c.unread > 0) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Spacer(Modifier.width(8.dp))
                             CompactSimIcon(last?.line ?: c.line, state.preferences)
                             Spacer(Modifier.width(5.dp))
@@ -281,8 +293,8 @@ private fun ConversationHeader(c: Conversation, onBack: (() -> Unit)?, onStar: (
         Row(Modifier.fillMaxWidth().then(if (onBack != null) Modifier.statusBarsPadding() else Modifier).padding(horizontal = 6.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back to inbox", tint = Muted) }
             else Spacer(Modifier.width(14.dp))
-            Avatar(c.initials, c.name, small = true); Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) { Text(c.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(c.number, fontSize = 10.sp, color = Muted, maxLines = 1) }
+            Avatar(c.initials, c.displayName, small = true); Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) { Text(c.displayName, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); if (c.contactName == null && c.displayName != c.number) Text(c.number, fontSize = 10.sp, color = Muted, maxLines = 1) }
             IconButton(onClick = onStar, modifier = Modifier.size(36.dp)) { Icon(if (c.starred) Icons.Outlined.Star else Icons.Outlined.StarOutline, if (c.starred) "Unstar conversation" else "Star conversation", tint = if (c.starred) Work else Muted, modifier = Modifier.size(20.dp)) }
             if (!c.spam && !c.blocked) IconButton(onClick = onArchive, modifier = Modifier.size(36.dp)) { Icon(if (c.archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive, if (c.archived) "Restore conversation" else "Archive conversation", tint = Muted, modifier = Modifier.size(20.dp)) }
             if (onAssistant != null) IconButton(onClick = onAssistant, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.AutoAwesome, "Open AI assistance", tint = Muted, modifier = Modifier.size(20.dp)) }
@@ -301,7 +313,7 @@ private fun ConversationHeader(c: Conversation, onBack: (() -> Unit)?, onStar: (
 }
 
 @Composable
-private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewModel, showHeader: Boolean, onAssistant: (AiTask) -> Unit, onSpamAction: (String) -> Unit, onReadMessage: (String) -> Unit) {
+private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewModel, showHeader: Boolean, onAssistant: (AiTask) -> Unit, onSpamAction: (String) -> Unit, onReadMessage: (String) -> Unit, onForward: (String) -> Unit) {
     val c = state.selected
     if (c == null) {
         Box(modifier.fillMaxHeight(), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(30.dp)) { Icon(Icons.Outlined.Forum, null, Modifier.size(48.dp), tint = Forest); Text("Make a little connection.", fontSize = 22.sp, modifier = Modifier.padding(top = 20.dp)); Text("Choose a conversation to get started.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp)) } }
@@ -332,49 +344,41 @@ private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewMode
                         HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
                     }
                 }
-                MessageBubble(m, state.preferences, if (readAvailable && !m.outgoing) ({ onReadMessage(m.id) }) else null)
+                MessageBubble(m, state.preferences, if (readAvailable && !m.outgoing) ({ onReadMessage(m.id) }) else null, { onForward(m.id) })
             }
         }
-        if (!c.spam && !c.blocked) Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 12.dp)) {
-            if (state.preferences.aiEnabled && (state.preferences.aiReplies || state.preferences.aiSummaries)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                if (state.preferences.aiSummaries) TextButton(onClick = { onAssistant(AiTask.SUMMARY) }) { Text("Summarize", fontSize = 12.sp) }
-                if (state.preferences.aiReplies) TextButton(onClick = { onAssistant(AiTask.REPLIES) }) { Text("Suggest reply", fontSize = 12.sp) }
-            }
-            Surface(shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), color = MaterialTheme.colorScheme.surface) {
-                Column(Modifier.padding(12.dp)) {
-                    OutlinedTextField(value = state.draft, onValueChange = model::draft, placeholder = { Text("Write something thoughtful…", fontSize = 15.sp) },
-                        modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4,
-                        colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.Transparent, focusedBorderColor = Color.Transparent),
-                        textStyle = MaterialTheme.typography.bodyLarge)
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        LinePicker(state.sendSubscriptionId, state.subscriptions, state.preferences, model::sendSubscription)
-                        Spacer(Modifier.weight(1f))
-                        IconButton(onClick = model::polishDraft, enabled = state.draft.isNotBlank(), modifier = Modifier.size(36.dp)) {
-                            Icon(Icons.Outlined.Spellcheck, "Tidy draft with local rules", modifier = Modifier.size(18.dp), tint = Muted)
-                        }
-                        Button(onClick = model::send, enabled = state.draft.isNotBlank() && state.canSend, shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)) {
-                            Text("Send", fontSize = 14.sp); Spacer(Modifier.width(8.dp)); Icon(Icons.AutoMirrored.Outlined.Send, null, Modifier.size(16.dp))
-                        }
-                    }
-                }
-            }
-            Text("SMS · ${state.draft.length} characters", fontSize = 10.sp, color = Muted, modifier = Modifier.padding(top = 8.dp))
-            if (state.sendSubscriptionId == null) Text(if (state.subscriptions.isEmpty()) "Insert or enable a SIM to send SMS." else "Choose a sending SIM above. Set a default in Settings.", fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 5.dp))
-        }
+        if (!c.spam && !c.blocked) ConversationComposer(state, model, onAssistant)
     }
+
 }
 
 @Composable
-private fun MessageBubble(message: Message, preferences: Preferences, onRead: (() -> Unit)? = null) {
+private fun MessageBubble(message: Message, preferences: Preferences, onRead: (() -> Unit)? = null, onForward: () -> Unit) {
+    val context = LocalContext.current
+    var actions by remember(message.id) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), horizontalAlignment = if (message.outgoing) Alignment.End else Alignment.Start) {
-        Surface(shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomEnd = if (message.outgoing) 3.dp else 14.dp, bottomStart = if (message.outgoing) 14.dp else 3.dp),
-            color = if (message.outgoing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(.9f)) {
-            Text(message.text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp), fontSize = 16.sp, lineHeight = 26.sp, color = if (message.outgoing) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
+        Box(Modifier.widthIn(max = 360.dp).fillMaxWidth(.9f)) {
+            Surface(shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp, bottomEnd = if (message.outgoing) 3.dp else 14.dp, bottomStart = if (message.outgoing) 14.dp else 3.dp),
+                color = if (message.outgoing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClickLabel = "Message actions", onLongClick = { actions = true })) {
+                Text(message.text, modifier = Modifier.padding(horizontal = 16.dp, vertical = 13.dp), fontSize = 16.sp, lineHeight = 26.sp, color = if (message.outgoing) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
+            }
+            DropdownMenu(expanded = actions, onDismissRequest = { actions = false }) {
+                DropdownMenuItem(text = { Text("Copy") }, onClick = { actions = false; copyMessage(context, message.text) }, leadingIcon = { Icon(Icons.Outlined.ContentCopy, null) })
+                DropdownMenuItem(text = { Text("Forward") }, onClick = { actions = false; onForward() }, leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Send, null) })
+                DropdownMenuItem(text = { Text("Share") }, onClick = { actions = false; shareMessage(context, message.text) }, leadingIcon = { Icon(Icons.Outlined.Share, null) })
+            }
         }
-        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("${clock(message.timestamp)} · ${preferences.label(message.line)}", fontSize = 10.sp, color = Muted)
+        Row(Modifier.widthIn(max = 360.dp).fillMaxWidth(.9f).padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(clock(message.timestamp), fontSize = 10.sp, color = Muted)
+            Spacer(Modifier.width(5.dp)); CompactSimIcon(message.line, preferences)
+            if (message.outgoing) {
+                Spacer(Modifier.width(5.dp))
+                Text(when (message.delivery) { Delivery.SENDING -> "Sending…"; Delivery.SENT -> "Sent"; Delivery.DELIVERED -> "Delivered"; Delivery.FAILED -> "Send failed"; Delivery.UNDELIVERED -> "Not delivered"; else -> "Status unknown" }, modifier = Modifier.weight(1f), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = if (message.delivery == Delivery.FAILED || message.delivery == Delivery.UNDELIVERED) MaterialTheme.colorScheme.error else Muted)
+            }
+            if (!message.outgoing) Spacer(Modifier.weight(1f))
             if (onRead != null) IconButton(onClick = onRead, modifier = Modifier.size(28.dp)) { Icon(Icons.AutoMirrored.Outlined.VolumeUp, "Read message through selected headset", Modifier.size(15.dp), tint = Forest) }
-            if (message.outgoing) { Spacer(Modifier.width(5.dp)); Icon(if (message.delivery == Delivery.DELIVERED) Icons.Outlined.DoneAll else if (message.delivery == Delivery.FAILED || message.delivery == Delivery.UNDELIVERED) Icons.Outlined.ErrorOutline else Icons.Outlined.Done, null, Modifier.size(12.dp), tint = Muted); Spacer(Modifier.width(3.dp)); Text(when (message.delivery) { Delivery.SENDING -> "Sending…"; Delivery.SENT -> "Sent"; Delivery.DELIVERED -> "Delivered"; Delivery.FAILED -> "Send failed · check before retrying"; Delivery.UNDELIVERED -> "Not delivered"; else -> "Status unknown" }, fontSize = 10.sp, color = if (message.delivery == Delivery.FAILED || message.delivery == Delivery.UNDELIVERED) MaterialTheme.colorScheme.error else Muted) }
+            IconButton(onClick = { actions = true }, modifier = Modifier.size(28.dp)) { Icon(Icons.Outlined.MoreHoriz, "Copy, forward or share message", Modifier.size(16.dp), tint = Muted) }
         }
     }
 }

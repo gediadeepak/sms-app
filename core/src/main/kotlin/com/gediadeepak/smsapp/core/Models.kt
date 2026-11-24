@@ -33,8 +33,10 @@ data class Conversation(
     val subscriptionId: Int? = null,
     val spam: Boolean = false,
     val blocked: Boolean = false,
+    val contactName: String? = null,
 ) {
-    val initials: String get() = name.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
+    val displayName get() = contactName ?: name
+    val initials: String get() = displayName.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
 }
 
 data class Preferences(
@@ -76,7 +78,7 @@ fun filterConversations(items: List<Conversation>, folder: Folder, line: SimLine
             Folder.SPAM -> false
         }
         folderMatch && (line == null || c.line == line) &&
-            (search.isEmpty() || c.name.contains(search, true) || c.number.contains(search, true) || c.messages.any { it.text.contains(search, true) })
+            (search.isEmpty() || c.displayName.contains(search, true) || c.name.contains(search, true) || c.number.contains(search, true) || c.messages.any { it.text.contains(search, true) })
     }.sortedByDescending { it.messages.lastOrNull()?.timestamp ?: Long.MAX_VALUE }
 }
 

@@ -75,25 +75,7 @@ internal fun LinePicker(selected: Int?, subscriptions: List<DeviceSim>, preferen
 }
 
 @Composable
-internal fun NewConversationDialog(state: InboxState, onCreate: (String, String, Int?) -> String?, onDismiss: () -> Unit) {
-    var name by rememberSaveable { mutableStateOf("") }; var number by rememberSaveable { mutableStateOf("") }
-    var subscription by rememberSaveable { mutableStateOf(resolveSendingSubscription(state.preferences.defaultSubscriptionId, state.subscriptions.map { it.subscriptionId })) }
-    var error by rememberSaveable { mutableStateOf<String?>(null) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("A simple hello.", fontWeight = FontWeight.SemiBold) }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("START A CONVERSATION", fontSize = 11.sp, color = Muted)
-            OutlinedTextField(value = name, onValueChange = { name = it.take(60) }, label = { Text("Name (optional)") }, singleLine = true)
-            OutlinedTextField(value = number, onValueChange = { number = it.take(22); error = null }, label = { Text("Phone number") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), isError = error != null)
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
-            Text("Send from", fontSize = 14.sp, color = Muted)
-            LinePicker(subscription, state.subscriptions, state.preferences, { subscription = it })
-            Text("Choose a SIM here or in the composer before sending.", fontSize = 12.sp, color = Muted)
-        }
-    }, confirmButton = { Button(onClick = { error = onCreate(name, number, subscription); if (error == null) onDismiss() }) { Text("Start conversation") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
-}
-
-@Composable
-internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onTestNotifications: () -> Unit, onAppSettings: () -> Unit, aiAccess: AiAccessState, onAiCheck: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onBlockedSenders: () -> Unit, onHeadset: () -> Unit, onDismiss: () -> Unit) {
+internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onTestNotifications: () -> Unit, onAppSettings: () -> Unit, aiAccess: AiAccessState, onAiCheck: () -> Unit, onContacts: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onBlockedSenders: () -> Unit, onHeadset: () -> Unit, onDismiss: () -> Unit) {
     val preferences = state.preferences
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
     var personal by rememberSaveable(preferences.personalLabel) { mutableStateOf(preferences.personalLabel) }
@@ -116,6 +98,11 @@ internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, on
                 Text("Default sending SIM", style = MaterialTheme.typography.titleSmall)
                 LinePicker(preferences.defaultSubscriptionId, state.subscriptions, preferences, { onSave(preferences.copy(defaultSubscriptionId = it)) }, showAsk = true)
                 Text("With multiple SIMs, Ask every time leaves sending disabled until you choose a line in the composer. If a saved SIM disappears, choose again.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)
+            }
+            SettingsSection("Contacts", if (state.contactsGranted) "Names and recipient search enabled" else "Optional permission", expanded == "contacts", { toggle("contacts") }) {
+                Text("Use your device address book to show matching names and find recipients. Contact names replace numbers in the inbox and conversation header. Your address book is not uploaded or added to backups.", fontSize = 13.sp, color = Muted, lineHeight = 21.sp)
+                OutlinedButton(onClick = onContacts, modifier = Modifier.fillMaxWidth()) { Text(if (state.contactsGranted) "Refresh contact names" else "Allow contacts") }
+                TextButton(onClick = onAppSettings) { Text("Manage Android permissions") }
             }
             SettingsSection("AI assistance", if (preferences.aiEnabled) "Gemini summaries and reply drafts" else "Off · optional Google Gemini features", expanded == "ai", { toggle("ai") }) {
                 Text("AI uses Google Gemini through Firebase. When you tap Generate, eligible text from the conversation you select is sent to Google. Review the preview first. Cloud processing and charges may apply.", fontSize = 13.sp, color = Muted, lineHeight = 21.sp)

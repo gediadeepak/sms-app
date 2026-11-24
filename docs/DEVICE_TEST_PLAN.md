@@ -102,3 +102,14 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 - Check the 10-second cooldown and daily per-install limit. These are best-effort client restrictions, not a billing guarantee.
 - Export/restore a backup: AI opt-in/results/request counters must not be transferred and AI must be disabled after restore. Verify old backups still restore.
 - Verify a production-signed internal build with Play Integrity; debug registration must not be accepted as a release fallback. Confirm all six themes and large-font/keyboard layouts on the full-screen AI page.
+
+## Message actions, contacts and inline AI (0.6.0)
+
+- Contacts permission is optional: test allow, deny, permanent denial/settings, revoke and regrant without losing SMS access. Names refresh after editing/deleting a contact and disappear after revocation. No contact data is copied into backups or AI metadata.
+- Match national/international formats, different country codes with shared suffixes and ambiguous duplicates. Only a full normalized match may hide the number in inbox/thread headers. Unknown and alphanumeric senders retain their original identity.
+- New message/Forward are full pages. Search contacts by name (including accents) and partial formatted number; select among multiple phone entries and recent conversations. Verify recipient and SIM; retain manual alias support.
+- Long-press or menu an incoming/outgoing message: Copy full text, paste at cursor or over selection, and Share through the system chooser. Test Android clipboard restrictions, emoji, line breaks and the 1,600-character limit. No body text should be logged or placed in Toast previews.
+- Forward into new and existing conversations with existing unsent drafts; preserve both pieces of text. Blocked/spam recipients cannot receive a forward until restored. Source deletion/unavailability and oversized content must not send or silently truncate anything. Copy/Share remain full-body actions.
+- Inline AI: generate into an empty draft and an existing draft, change alternatives, manually edit a generated draft, and type while generation runs. User edits must survive and no SMS should be transmitted until Send. Verify changing conversation or source context discards late replies.
+- Check keyboard/large-font layout, all six themes, copy/share cancellation, recipient page Back/rotation and notification unread behaviour while a recipient page is visible.
+- Physical headset check: after Contacts permission is granted, announcements use matched contact names; denied permission retains alias/number fallback and offline-only speech.

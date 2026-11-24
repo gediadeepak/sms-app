@@ -7,6 +7,9 @@ data class AiUiState(
     val summary: String? = null,
     val replies: List<String> = emptyList(),
     val error: String? = null,
+    val draftBeforeInsertion: String? = null,
+    val insertedDraft: String? = null,
+    val insertedReply: String? = null,
 )
 
 data class AiAccessState(val checking: Boolean = false, val message: String? = null)

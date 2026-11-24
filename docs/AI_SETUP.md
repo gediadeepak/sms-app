@@ -1,4 +1,4 @@
-# Sandesh AI setup (0.5.0)
+# Sandesh AI setup (0.6.0)
 
 Sandesh uses Firebase AI Logic with the Gemini Developer API and `gemini-3.5-flash-lite`. It makes one text request per explicit action. There are no embedded Gemini secrets, autonomous replies, background inbox uploads, model tools or business grouping in this version.
 
@@ -55,7 +55,7 @@ Register `com.sandesh.app` with Play Integrity under Firebase App Check and conf
 - One request at a time, a 45-second timeout, a 768-output-token ceiling, 10 seconds between generation attempts and 30 attempts per UTC day per installation. Failed/billed generation attempts count. App Check failures before generation do not. These client limits can reset or be bypassed; they are not a server-side quota or financial cap.
 - Text and model answers are not saved by Sandesh or included in backups. The provider and project monitoring policies govern server processing/retention. Disabling AI or cancelling waiting cannot retract submitted text or guarantee that a request will not be billed.
 - Switching conversations, blocking/spam state changes, loss of SMS access, disabling AI or restoring a backup cancels waiting and discards applicable results. Responses are bound to the prepared conversation fingerprint. A changed context requires generating again.
-- Suggestions are inserted only through **Use as draft / Add to existing draft**. Existing draft text is preserved. Sending remains a separate user action using the normal SIM picker and SMS transport.
+- The conversation composer has an **AI reply** action that generates from recent eligible history and inserts the first suggestion if the draft has not changed while waiting. Existing text is preserved. Inline alternatives replace an unchanged previous AI insertion; after manual edits they append instead. If you type while generation runs, no automatic insertion occurs. The full-screen page also offers **Use as draft / Add to existing draft**. Sending remains a separate user action using the normal SIM picker and SMS transport. Contact-book names and numbers are not added to AI input.
 - AI enablement is device-specific and excluded from encrypted backups. Restore disables AI so the user must opt in again. Existing backup formats remain readable.
 
 ## Validation before enabling for other users

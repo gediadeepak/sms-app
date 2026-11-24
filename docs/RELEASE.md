@@ -1,8 +1,10 @@
 # Sandesh release preparation
 
-Version: 0.5.0 (code 10), application ID `com.sandesh.app`, minimum API 24, target API 37. Includes recoverable manual Spam, an app-local blocked-sender list and opt-in sender announcements/manual SMS readout through a selected headset on Android 9+. Notification diagnostics, compact SIM icons and separate account/backup pages remain available. Earlier com.gediadeepak.smsapp builds install separately; their private settings do not migrate automatically. Google sign-in requires the correct signing fingerprint registered in Firebase.
+Version: 0.6.0 (code 11), application ID `com.sandesh.app`, minimum API 24, target API 37. Includes recoverable manual Spam, an app-local blocked-sender list and opt-in sender announcements/manual SMS readout through a selected headset on Android 9+. Notification diagnostics, compact SIM icons and separate account/backup pages remain available. Earlier com.gediadeepak.smsapp builds install separately; their private settings do not migrate automatically. Google sign-in requires the correct signing fingerprint registered in Firebase.
 
 Settings now opens from the left drawer as a full-screen page with expandable sections. Account, backup, password entry, restore preview, blocked senders and headset configuration use full-screen pages with Back navigation. Appearance, default SIM and AI controls save immediately; edited SIM labels have their own Save button. Three additional saved palettes (Purple & white, Rose & white and Amber & white) bring the total to six themes. The appearance picker shows color swatches. Existing saved theme names remain compatible. Optional Gemini summaries and editable reply suggestions replace the demo assistant. AI is off by default, has independent controls, shows a text preview, and uses Firebase App Check. Complete [AI setup](AI_SETUP.md), provider billing/quota configuration and signed physical-device validation before enabling it for a release.
+
+New in 0.6.0: copy/paste, message forwarding into drafts, Android sharing, optional contact names and recipient search, and inline AI reply generation in the composer. READ_CONTACTS is optional and separate from SMS setup. The address book is local-only. Forwarded/copied/AI text is not silently truncated or automatically sent. Use the added device checks before release.
 
 ## Build and signing
 

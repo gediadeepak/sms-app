@@ -13,6 +13,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.gediadeepak.smsapp.data.SandeshDatabase
+import com.gediadeepak.smsapp.data.ContactsRepository
 import com.gediadeepak.smsapp.core.ReadoutRouteGuard
 import com.gediadeepak.smsapp.core.ReadoutRouteDecision
 import com.gediadeepak.smsapp.telephony.SmsAccess
@@ -109,7 +110,7 @@ class HeadsetReadoutService : Service() {
                         val database = SandeshDatabase.get(this@HeadsetReadoutService)
                         val metadata = database.threadMetadata(thread)
                         check(!database.isSenderBlocked(address) && metadata?.spam != true) { "Spam and blocked messages are not read aloud." }
-                        arrayOf(thread, address, metadata?.alias?.takeIf { it.isNotBlank() } ?: address, if (bodyRequest) c.getString(2).orEmpty() else "")
+                        arrayOf(thread, address, ContactsRepository(this@HeadsetReadoutService).name(address) ?: metadata?.alias?.takeIf { it.isNotBlank() } ?: address, if (bodyRequest) c.getString(2).orEmpty() else "")
                     } ?: error("That message is unavailable.")
                 }
                 if (token != generation || destroyed) return@launch

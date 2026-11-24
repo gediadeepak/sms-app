@@ -41,6 +41,9 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 
 - Optional Firebase AI Logic conversation summaries and reply drafts, with independent settings, a preview before sharing, sensitive-message heuristics and local request limits. Generated replies never send automatically; existing drafts are preserved. App Check uses the debug provider locally and Play Integrity in release. AI settings/results are excluded from backups; restore disables AI.
 
+- Message actions: long-press a bubble or tap its menu to **Copy**, **Forward** or **Share**. Paste respects the composer cursor/selection. Forwarding opens a recipient picker and prepares an editable draft; only the normal Send button transmits SMS.
+- **AI reply** drafts directly in the conversation composer from recent eligible history, with tone controls and alternatives. Existing text is preserved; typing during generation prevents automatic insertion. Summaries and full text previews remain available.
+
 ## First launch
 
 1. Read the SMS-only limitations on setup before changing your default app.
@@ -56,7 +59,7 @@ No seeded conversations are loaded by the Android app. Version 0.3.0 switches to
 
 - **SMS only. MMS attachment downloading/display, group MMS and RCS are not implemented.** Making Sandesh default can affect those features. MMS notification PDUs are retained and an explicit unsupported-MMS notification/banner is shown; attachments are not retrieved. Keep your previous messaging app installed.
 - Backups are manual and limited to 16 MiB of uncompressed data / 100,000 SMS messages. Keep the independent backup password safe: account password reset cannot recover it. Cloud backup requires Firebase console setup and private Firestore rules before use. Android automatic app backup/device transfer stays excluded. Local SQLite storage is protected by Android, not by the backup password.
-- No contacts permission or automatic contact-name lookup; existing conversations show phone numbers, with optional aliases for conversations you create.
+- Contacts access is optional. Grant it from the inbox, new-message page or Settings to show matched names and search recipients. Unknown or ambiguous senders keep their number; aliases remain available. Contact data stays local and is excluded from SMS backup and AI input metadata.
 - Cloud AI requires owner-side Firebase AI Logic, App Check and billing/quota setup. It is opt-in, may be inaccurate and processes the selected text with Google. Filtering is heuristic, not a privacy guarantee. Draft tidying remains on-device text rules.
 - Unknown/removed historical subscriptions show **Unknown SIM** rather than an invented line.
 - Telecom's “respond via message” service posts a review notification and opens a draft; it does not send silently. Notifications must be enabled for this flow.

@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
     private var pendingIntent by mutableStateOf<Intent?>(null)
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { model.refresh() }
     private val notificationLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { model.refresh() }
+    private val contactsLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { model.refreshContacts() }
     private val notificationPrompts by lazy { getSharedPreferences("sandesh_permission_prompts", MODE_PRIVATE) }
     private val roleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (SmsAccess.isDefault(this)) requestSmsPermissions()
@@ -84,7 +85,7 @@ class MainActivity : ComponentActivity() {
                     Box(if (accountDestination != null) Modifier.fillMaxSize().clearAndSetSemantics { } else Modifier.fillMaxSize()) {
                       SandeshApp(model, ::setupSms, ::openAppSettings, ::requestNotifications,
                         onAccount = { accountDestination = AccountDestination.ACCOUNT }, onBackup = { accountDestination = AccountDestination.BACKUP },
-                        onTestNotifications = ::testNotifications, onReadMessage = ::readMessage)
+                        onTestNotifications = ::testNotifications, onReadMessage = ::readMessage, onContacts = ::requestContacts)
                     }
                     accountDestination?.let { start -> AccountBackupFlow(account, start, state.ready,
                         onPickRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onDismiss = { accountDestination = null }) }
@@ -119,6 +120,13 @@ class MainActivity : ComponentActivity() {
         if (SmsNotifications.status(this) != SmsNotificationStatus.ENABLED) { requestNotifications(); return }
         if (SmsNotifications.test(this)) Toast.makeText(this, "Test alert requested. Swipe down to check your notification panel.", Toast.LENGTH_LONG).show()
         else model.reportError("Android blocked the test notification. Check Sandesh’s notification settings.")
+    }
+    private fun requestContacts() {
+        if (SmsAccess.allowed(this, Manifest.permission.READ_CONTACTS)) { model.refreshContacts(); return }
+        if (!notificationPrompts.getBoolean("contacts_requested", false) || shouldShowRequestPermissionRationale(Manifest.permission.READ_CONTACTS)) {
+            notificationPrompts.edit().putBoolean("contacts_requested", true).apply()
+            contactsLauncher.launch(Manifest.permission.READ_CONTACTS)
+        } else openAppSettings()
     }
     private fun readMessage(id: String) {
         if (!HeadsetReadout.start(this, id, true)) model.reportError(HeadsetReadout.problem(this) ?: "Unable to start headset readout. Try again while Sandesh is open.")

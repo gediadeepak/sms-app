@@ -5,6 +5,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Telephony
+import android.provider.ContactsContract
 import android.telephony.SubscriptionManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +28,7 @@ data class InboxState(
     val loading: Boolean = false, val sending: Boolean = false, val error: String? = null, val pendingMms: Int = 0,
     val notificationStatus: SmsNotificationStatus = SmsNotificationStatus.ENABLED,
     val blockedSenders: List<String> = emptyList(),
+    val contactsGranted: Boolean = false, val contacts: List<PhoneContact> = emptyList(),
 ) {
     val selected get() = conversations.find { it.id == selectedId }
     val visible get() = filterConversations(conversations, folder, filterLine, query)
@@ -40,6 +42,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     private val preferences = PreferenceStore(context)
     private val repository = DeviceSmsRepository(context)
     private val database = SandeshDatabase.get(context)
+    private val contactsRepository = ContactsRepository(context)
     private val mutableState = MutableStateFlow(InboxState(preferences = preferences.load()))
     val state = mutableState.asStateFlow()
     private val assistant = FirebaseSmsAssistant(context)
@@ -79,7 +82,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun generateAi(task: AiTask, tone: Tone, expectedFingerprint: String) {
+    fun generateAi(task: AiTask, tone: Tone, expectedFingerprint: String, insertIntoDraft: Boolean = false) {
         val snapshot = state.value
         val conversation = snapshot.selected ?: return
         if (!snapshot.ready || !SmsAccess.ready(context) || conversation.spam || conversation.blocked || !snapshot.preferences.aiEnabled ||
@@ -97,7 +100,13 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val answer = assistant.generate(input, task, tone)
                 invalidateAiIfChanged()
-                if (generation == aiGeneration) mutableAi.value = AiUiState(conversation.id, input.fingerprint, summary = answer.summary, replies = answer.replies)
+                if (generation == aiGeneration) {
+                    mutableAi.value = AiUiState(conversation.id, input.fingerprint, summary = answer.summary, replies = answer.replies)
+                    if (insertIntoDraft && task == AiTask.REPLIES && answer.replies.isNotEmpty()) {
+                        if (state.value.draft == snapshot.draft) insertAiReply(answer.replies.first())
+                        else mutableAi.update { it.copy(error = "Your draft changed while AI was working. Choose a suggestion below to preserve your edits.") }
+                    }
+                }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 invalidateAiIfChanged()
@@ -112,17 +121,20 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
         val result = mutableAi.value
         val snapshot = state.value
         if (result.conversationId != snapshot.selectedId || text !in result.replies || !snapshot.preferences.aiEnabled || !snapshot.preferences.aiReplies) return false
-        val combined = if (snapshot.draft.isBlank()) text else snapshot.draft + "\n" + text
-        if (combined.length > 1600) {
+        val base = if (snapshot.draft == result.insertedDraft) result.draftBeforeInsertion.orEmpty() else snapshot.draft
+        val combined = ComposerRules.append(base, text)
+        if (combined == null) {
             mutableAi.update { it.copy(error = "Your draft is too long to add this suggestion. Shorten it first.") }
             return false
         }
         draft(combined)
+        mutableAi.update { it.copy(draftBeforeInsertion = base, insertedDraft = combined, insertedReply = text, error = null) }
         return true
     }
     private val drafts = mutableMapOf<String, Pair<String, Int?>>()
     private val emptyThreads = mutableMapOf<String, Conversation>()
     private var refreshJob: Job? = null
+    private var openingConversation: Job? = null
     private var refreshVersion = 0
     private var restoring = false
     private var completedRestore = 0
@@ -138,6 +150,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     }
     private var subscriptionListenerRegistered = false
     private var observerRegistered = false
+    private var contactsObserverRegistered = false
     private var foreground = false
     private var windowFocused = false
     private var contentOverlayVisible = false
@@ -149,6 +162,8 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     fun setForeground(value: Boolean) { foreground = value; if (value) refresh() }
     private val subscriptionListener = object : SubscriptionManager.OnSubscriptionsChangedListener() { override fun onSubscriptionsChanged() { refresh() } }
     private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) { override fun onChange(selfChange: Boolean) { refresh() } }
+    private val contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) { override fun onChange(selfChange: Boolean) { refreshContacts() } }
+    fun refreshContacts() { contactsRepository.invalidate(); refresh() }
     init {
         // Some OEMs restrict provider observers before the SMS role is granted.
         observerRegistered = runCatching { context.contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer) }.isSuccess
@@ -165,12 +180,20 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             val ready = SmsAccess.ready(context)
             val sims = SmsAccess.subscriptions(context)
             val notificationStatus = SmsNotifications.status(context)
+            val contactsAllowed = contactsRepository.allowed()
+            if (contactsAllowed && !contactsObserverRegistered) {
+                contactsObserverRegistered = runCatching { context.contentResolver.registerContentObserver(ContactsContract.Contacts.CONTENT_URI, true, contactsObserver) }.isSuccess
+            } else if (!contactsAllowed && contactsObserverRegistered) {
+                runCatching { context.contentResolver.unregisterContentObserver(contactsObserver) }; contactsObserverRegistered = false
+                contactsRepository.invalidate()
+            }
             mutableState.update { current ->
                 val id = current.sendSubscriptionId?.takeIf { id -> sims.any { it.subscriptionId == id } }
                 current.copy(defaultSms = default, permissionsGranted = ready, subscriptions = sims, notificationStatus = notificationStatus,
                     hasTelephony = SmsAccess.hasTelephony(context), loading = ready, sendSubscriptionId = id,
                     sendLine = sims.find { it.subscriptionId == id }?.line ?: SimLine.UNKNOWN,
-                    conversations = if (ready) current.conversations else emptyList())
+                    contactsGranted = contactsAllowed, contacts = if (contactsAllowed) current.contacts else emptyList(),
+                    conversations = if (!ready) emptyList() else if (contactsAllowed) current.conversations else current.conversations.map { it.copy(contactName = null) })
             }
             if (!subscriptionListenerRegistered && SmsAccess.allowed(context, android.Manifest.permission.READ_PHONE_STATE)) {
                 runCatching { context.getSystemService(SubscriptionManager::class.java).addOnSubscriptionsChangedListener(subscriptionListener); subscriptionListenerRegistered = true }
@@ -179,12 +202,22 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             if (!ready) return@launch
             if (!observerRegistered) observerRegistered = runCatching { context.contentResolver.registerContentObserver(Telephony.Sms.CONTENT_URI, true, observer) }.isSuccess
             try {
-                val result = withContext(Dispatchers.IO) { repository.drainPendingIncoming(); repository.load(sims) to database.pendingMmsCount() }
+                val emptySnapshot = emptyThreads.values.toList()
+                val result = withContext(Dispatchers.IO) {
+                    repository.drainPendingIncoming()
+                    val contactList = contactsRepository.load()
+                    val loaded = repository.load(sims)
+                    Triple((loaded + emptySnapshot.filter { draft -> loaded.none { it.id == draft.id } }).map { it.copy(contactName = contactsRepository.name(it.number)) }, database.pendingMmsCount(), contactList)
+                }
                 val blocked = withContext(Dispatchers.IO) { database.blockedSenders().values.toList() }
                 if (version != refreshVersion || !SmsAccess.ready(context)) return@launch
                 val visibleThread = state.value.selectedId.takeIf { conversationVisible() }
                 if (result.first.any { it.id == visibleThread && it.unread > 0 }) withContext(Dispatchers.IO) { repository.markRead(visibleThread!!) }
-                mutableState.update { it.copy(conversations = result.first.map { c -> if (c.id == visibleThread) c.copy(unread = 0) else c } + emptyThreads.values.filter { draft -> result.first.none { loaded -> loaded.id == draft.id } }, loading = false, pendingMms = result.second, blockedSenders = blocked) }
+                val contactsStillAllowed = contactsRepository.allowed()
+                mutableState.update { it.copy(conversations = result.first.map { c ->
+                    c.copy(unread = if (c.id == visibleThread) 0 else c.unread, contactName = c.contactName.takeIf { contactsStillAllowed })
+                } + emptyThreads.values.filter { draft -> result.first.none { loaded -> loaded.id == draft.id } }.map { c -> c.copy(contactName = c.contactName.takeIf { contactsStillAllowed }) },
+                    contactsGranted = contactsStillAllowed, contacts = if (contactsStillAllowed) result.third else emptyList(), loading = false, pendingMms = result.second, blockedSenders = blocked) }
                 invalidateAiIfChanged()
             } catch (e: CancellationException) { throw e }
             catch (_: SecurityException) { mutableState.update { it.copy(loading = false, permissionsGranted = false, conversations = emptyList(), error = "SMS access changed. Check Sandesh’s permissions.") } }
@@ -281,24 +314,38 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             finally { mutableState.update { it.copy(sending = false) } }
         }
     }
-    fun newConversation(name: String, number: String, subscription: Int?, body: String? = null): String? {
+    fun newConversation(name: String, number: String, subscription: Int?, body: String? = null, appendBody: Boolean = false): String? {
         val destination = number.trim()
         if (!validNumber(destination)) return "Enter a valid phone number with 6–15 digits."
         if (!state.value.ready) return "Complete SMS setup first."
-        viewModelScope.launch {
+        if (openingConversation?.isActive == true) return "A conversation is opening. Please wait a moment."
+        openingConversation = viewModelScope.launch {
             try {
                 val id = withContext(Dispatchers.IO) { repository.threadId(destination).also { id -> if (name.isNotBlank()) repository.updateMetadata(id) { it.copy(alias = name.trim().take(60)) } } }
-                val blocked = withContext(Dispatchers.IO) { database.isSenderBlocked(destination) }
+                val (blocked, spam) = withContext(Dispatchers.IO) { database.isSenderBlocked(destination) to (database.threadMetadata(id)?.spam == true) }
+                if (appendBody && (blocked || spam)) { reportError("Unblock or restore this recipient before forwarding."); return@launch }
+                val contactName = withContext(Dispatchers.IO) { contactsRepository.name(destination) }
+                val existingDraft = if (state.value.selectedId == id) state.value.draft else drafts[id]?.first.orEmpty()
+                val preparedBody = if (body != null && appendBody) ComposerRules.append(existingDraft, body) else body
+                if (body != null && (preparedBody == null || preparedBody.length > ComposerRules.LIMIT)) { reportError("The forwarded message and existing draft exceed 1,600 characters. Nothing was replaced."); return@launch }
                 val line = state.value.subscriptions.find { it.subscriptionId == subscription }?.line ?: SimLine.UNKNOWN
                 if (state.value.conversations.none { it.id == id }) {
-                    val c = Conversation(id, name.trim().ifBlank { destination }, destination, line, subscriptionId = subscription, blocked = blocked)
+                    val c = Conversation(id, name.trim().ifBlank { destination }, destination, line, subscriptionId = subscription, blocked = blocked, spam = spam, contactName = contactName)
                     emptyThreads[id] = c; mutableState.update { it.copy(conversations = it.conversations + c) }
-                }
-                select(id); sendSubscription(subscription); if (body != null) draft(body)
+                } else mutableState.update { it.copy(conversations = it.conversations.map { c -> if (c.id == id) c.copy(
+                    name = name.trim().take(60).ifBlank { c.name }, contactName = contactName, spam = spam, blocked = blocked) else c }) }
+                select(id); sendSubscription(subscription); if (preparedBody != null) draft(preparedBody)
                 mutableState.update { it.copy(folder = Folder.INBOX, query = "", filterLine = null) }
             } catch (_: Exception) { mutableState.update { it.copy(error = "Could not open that conversation. Check SMS access.") } }
         }
         return null
+    }
+
+    fun forwardMessage(messageId: String, number: String, subscription: Int?): String? {
+        val source = state.value.conversations.asSequence().flatMap { it.messages.asSequence() }.firstOrNull { it.id == messageId }
+            ?: return "This message is no longer available."
+        if (source.text.length > ComposerRules.LIMIT) return "This message is longer than the 1,600-character composer limit. You can copy or share it in full instead."
+        return newConversation("", number, subscription, source.text, appendBody = true)
     }
     fun savePreferences(value: Preferences) {
         if (!value.aiEnabled || value.aiSummaries != state.value.preferences.aiSummaries || value.aiReplies != state.value.preferences.aiReplies) cancelAi()
@@ -319,6 +366,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     }
     override fun onCleared() {
         if (observerRegistered) runCatching { context.contentResolver.unregisterContentObserver(observer) }
+        if (contactsObserverRegistered) runCatching { context.contentResolver.unregisterContentObserver(contactsObserver) }
         if (subscriptionListenerRegistered) runCatching { context.getSystemService(SubscriptionManager::class.java).removeOnSubscriptionsChangedListener(subscriptionListener) }
         super.onCleared()
     }
