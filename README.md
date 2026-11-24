@@ -31,7 +31,7 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 - Three saved themes: **Blue & white** (default), **Green & white**, and **Black & white**.
 - A theme-tinted, transparent winged-envelope-and-hand logo, adaptive launcher icon and the supplied flying GIF as the splash. The supporting hand, envelope and animated wordmark are preserved. Playback follows Android's animation-duration setting.
 - Search, unread/starred/archived folders, drafts during the current app process, external `sms:`/`smsto:` compose intents and optional offline reply examples.
-- Optional Firebase email registration/login, email verification, password-reset emails and Google sign-in integration. Google sign-in needs an updated OAuth-enabled configuration; see [Firebase setup](docs/FIREBASE_SETUP.md).
+- Optional Firebase email registration/login, email verification, password-reset emails and Google sign-in integration. Version 0.3.1 includes the supplied web OAuth client configuration; provider enablement and signing fingerprints still need to match the installed build. See [Firebase setup](docs/FIREBASE_SETUP.md).
 - Password-encrypted file export/restore without an account, plus encrypted Firestore backup/restore for verified accounts. Restores merge SMS, skip existing messages and never send restored messages. Backups include thread flags, aliases and appearance; they exclude MMS, drafts, credentials and send jobs.
 
 ## First launch

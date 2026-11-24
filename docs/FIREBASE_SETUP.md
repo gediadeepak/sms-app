@@ -10,9 +10,11 @@ The supplied client configuration is included in app/google-services.json so a c
 2. Enable **Email/Password** under Sign-in method (password authentication, not email-link-only). Configure verification and password-reset templates and the support address.
 3. Enable **Google**, selecting the project's support email.
 4. In Project settings → Your apps → com.sandesh.app, add the debug certificate SHA-1 and SHA-256 fingerprints. Run `./gradlew.bat :app:signingReport` to obtain fingerprints. Register release fingerprints too; for Play distribution use the Play App Signing certificate, as applicable.
-5. Download the refreshed google-services.json, replace app/google-services.json, and rebuild. The originally supplied file has no OAuth clients. Until a web OAuth client is present, the app disables the Google button. Do not invent a client ID.
+5. Download the refreshed google-services.json, replace app/google-services.json, and rebuild. Version 0.3.1 includes the updated file supplied by the owner with a web OAuth client (type 3), enabling the Google button. This file contains no Android certificate client (type 1), so verify that the installed build's signing fingerprint is registered and test sign-in on a real device. Do not invent client IDs.
 
 See [Firebase's Android Google sign-in guide](https://firebase.google.com/docs/auth/android/google-signin). Provider settings cannot be enabled by copying the Android JSON alone.
+
+The app's resource keep file preserves Firebase options and the Google web client ID, which are read by name at runtime, in optimized releases. Check the final APK as well as generated Gradle resources when changing this configuration.
 
 ## Private cloud backups
 

@@ -1,6 +1,6 @@
 # Sandesh release preparation
 
-Version: 0.3.0 (code 3), application ID `com.sandesh.app`, minimum API 24, target API 37. This installs separately from the earlier `com.gediadeepak.smsapp` candidate; private settings do not migrate automatically. System SMS remains available after permission setup.
+Version: 0.3.1 (code 4), application ID `com.sandesh.app`, minimum API 24, target API 37. This installs separately from the earlier `com.gediadeepak.smsapp` candidate; private settings do not migrate automatically. System SMS remains available after permission setup. The supplied web OAuth client is included for Google sign-in; live sign-in still requires the correct Android signing fingerprint registered in Firebase.
 
 ## Build and signing
 
@@ -21,10 +21,19 @@ Run:
 
 Verify the final APK signature with Android SDK `apksigner verify --verbose <apk>`. An unsigned release APK is a build artifact, not an installable published release. The release AAB must also be signed before uploading.
 
+Check Firebase resources in both debug and optimized APKs after configuration changes:
+
+```powershell
+.\tools\Test-FirebaseApk.ps1 -ApkPath app/build/outputs/apk/debug/app-debug.apk -Aapt2Path '<SDK>/build-tools/36.0.0/aapt2.exe'
+.\tools\Test-FirebaseApk.ps1 -ApkPath app/build/outputs/apk/release/app-release-unsigned.apk -Aapt2Path '<SDK>/build-tools/36.0.0/aapt2.exe'
+```
+
+This checks that required configuration names survive resource shrinking. Actual Google account sign-in still needs physical-device validation.
+
 ## Publication gates still requiring completion
 
 - Execute and record the physical single-SIM and dual-SIM/eSIM tests in DEVICE_TEST_PLAN.md. Build success and pure Kotlin tests are not carrier tests.
-- Complete [Firebase setup](FIREBASE_SETUP.md): enable providers, register signing fingerprints, replace the JSON with an OAuth-enabled configuration, create Firestore and publish reviewed private rules. Live account flows and rules have not been verified by the build.
+- Complete [Firebase setup](FIREBASE_SETUP.md): enable providers, register signing fingerprints, create Firestore and publish reviewed private rules. The supplied JSON now includes the web OAuth client. Live account flows and rules have not been verified by the build.
 - Test encrypted file and cloud restore on actual devices, including wrong passwords, damaged files, duplicate merges, interrupted operations and account isolation.
 - Implement account/cloud-data deletion and a public deletion-request route before publishing account creation; this candidate has no deletion flow.
 - Resolve MMS/RCS scope before a broad default-messaging release. This candidate explicitly lacks MMS attachment/group support; it must not be marketed as a full replacement for those features.
