@@ -30,6 +30,40 @@ private val Blue = lightColorScheme(
     surfaceVariant = Color(0xFFF0F3FA), onSurfaceVariant = Color(0xFF65728C), surfaceContainerLow = Color(0xFFFAFBFF),
     outline = Color(0xFF7A8AB0), outlineVariant = Color(0xFFDFE5F1),
 )
+private val Purple = lightColorScheme(
+    primary = Color(0xFF6741B5), onPrimary = Color.White, primaryContainer = Color(0xFFEFE5FF), onPrimaryContainer = Color(0xFF422674),
+    secondary = Color(0xFF426B76), secondaryContainer = Color(0xFFE2F0F3), onSecondaryContainer = Color(0xFF294D57),
+    background = Color(0xFFF8F5FC), onBackground = Color(0xFF30263E), surface = Color.White, onSurface = Color(0xFF30263E),
+    surfaceVariant = Color(0xFFF0EBF6), onSurfaceVariant = Color(0xFF71647E), surfaceContainerLow = Color(0xFFFCFAFF),
+    surfaceContainer = Color(0xFFF3EDF9), surfaceContainerHigh = Color(0xFFECE5F3), surfaceContainerHighest = Color(0xFFE5DDED),
+    surfaceTint = Color(0xFF6741B5), outline = Color(0xFF8C7BA2), outlineVariant = Color(0xFFE3DAED),
+)
+private val Rose = lightColorScheme(
+    primary = Color(0xFFA72F66), onPrimary = Color.White, primaryContainer = Color(0xFFFFE5EF), onPrimaryContainer = Color(0xFF741B45),
+    secondary = Color(0xFF3C6E69), secondaryContainer = Color(0xFFE0F1EC), onSecondaryContainer = Color(0xFF264F4A),
+    background = Color(0xFFFFF6F9), onBackground = Color(0xFF402632), surface = Color.White, onSurface = Color(0xFF402632),
+    surfaceVariant = Color(0xFFF9EDF2), onSurfaceVariant = Color(0xFF80616F), surfaceContainerLow = Color(0xFFFFFAFC),
+    surfaceContainer = Color(0xFFFCEEF3), surfaceContainerHigh = Color(0xFFF5E5EC), surfaceContainerHighest = Color(0xFFEEDCE4),
+    surfaceTint = Color(0xFFA72F66), outline = Color(0xFFA07D8E), outlineVariant = Color(0xFFEEDCE4),
+)
+private val Amber = lightColorScheme(
+    primary = Color(0xFF8A5200), onPrimary = Color.White, primaryContainer = Color(0xFFFFE8BC), onPrimaryContainer = Color(0xFF653B00),
+    secondary = Color(0xFF476851), secondaryContainer = Color(0xFFE5F0DF), onSecondaryContainer = Color(0xFF2D4B36),
+    background = Color(0xFFFFF8EF), onBackground = Color(0xFF3D3021), surface = Color.White, onSurface = Color(0xFF3D3021),
+    surfaceVariant = Color(0xFFF7F0E5), onSurfaceVariant = Color(0xFF786852), surfaceContainerLow = Color(0xFFFFFCF7),
+    surfaceContainer = Color(0xFFFAF0E2), surfaceContainerHigh = Color(0xFFF3E7D6), surfaceContainerHighest = Color(0xFFECDDCA),
+    surfaceTint = Color(0xFF8A5200), outline = Color(0xFF9B886B), outlineVariant = Color(0xFFEADFCF),
+)
+
+internal fun sandeshColors(mode: ThemeMode): ColorScheme = when (mode) {
+    ThemeMode.BLUE -> Blue
+    ThemeMode.GREEN -> Green
+    ThemeMode.DARK -> Dark
+    ThemeMode.PURPLE -> Purple
+    ThemeMode.ROSE -> Rose
+    ThemeMode.AMBER -> Amber
+}
+
 private val Dark = darkColorScheme(
     primary = Color.White, onPrimary = Color.Black, primaryContainer = Color(0xFF303030), onPrimaryContainer = Color.White,
     secondary = Color(0xFFD3D3D3), secondaryContainer = Color(0xFF272727), onSecondaryContainer = Color(0xFFECECEC),
@@ -47,5 +81,5 @@ fun SandeshTheme(mode: ThemeMode = ThemeMode.BLUE, content: @Composable () -> Un
             isAppearanceLightStatusBars = !dark; isAppearanceLightNavigationBars = !dark
         } }
     }
-    MaterialTheme(colorScheme = when (mode) { ThemeMode.BLUE -> Blue; ThemeMode.GREEN -> Green; ThemeMode.DARK -> Dark }, typography = Typography(), content = content)
+    MaterialTheme(colorScheme = sandeshColors(mode), typography = Typography(), content = content)
 }

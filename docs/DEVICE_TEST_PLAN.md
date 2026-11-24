@@ -53,7 +53,7 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 
 ## Accounts and backup
 
-- Open the separate Account and Backup & restore settings entries. Login, registration, password reset, file backup and cloud backup must each show only their own controls. Check all three themes and large fonts.
+- Open the separate Account and Backup & restore settings entries. Login, registration, password reset, file backup and cloud backup must each show only their own controls. Check all six themes and large fonts.
 - Check toolbar Back and Android Back on every page. Passwords must clear when leaving a form or recreating the activity; the email can be retained. Cancel must never submit or restore.
 - From Cloud backup, sign in with an already verified account and confirm return to Cloud backup. For a new/unverified account, verify from Account, refresh and navigate back to Cloud backup. Sign-out must not erase SMS or backups.
 - Rotate during file selection, backup password entry and restore preview. The right page/dialog must return, passwords must not be restored, and no provider writes may happen until the explicit Restore confirmation.
@@ -82,10 +82,11 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 ## Settings navigation (0.4.1)
 
 - Open Settings from the left drawer on a phone and the persistent sidebar on a wide display. Confirm a full page replaces the inbox, and Back returns to the previous conversation/folder.
-- Expand each section; only one is expanded at a time. Check all three themes at large font size, with keyboard and after rotation.
+- Expand each section; only one is expanded at a time. Check all six themes at large font size, with keyboard and after rotation.
 - Change theme, default SIM and reply ideas; close/reopen and restart to confirm persistence. Save SIM labels; whitespace-only labels must not save.
 - Open Account, login, register, reset, Backup, File and Cloud pages; toolbar/system Back returns through the expected pages to Settings. Revisit after rotation.
 - Open backup password and restore preview pages; Back cancels without changing SMS. Do not retain passwords through rotation/process recreation. Verify normal encrypted export/restore still works.
 - Open Blocked senders and Headset readout. Back returns to the same expanded Settings section and scroll position. Unblock confirmation is also a page; Cancel returns without changing the block list.
 - While Settings/account/backup is visible, receive an SMS in the previously selected conversation: it must stay unread and notify normally.
 - In Headset readout, open Speech voice settings. Verify Android TTS settings opens (or Android Settings as a fallback), then return to the same page and test an installed offline voice.
+- Select Purple, Rose and Amber in turn; check inbox, thread, Settings, account, backup and the next splash. Restart and perform an encrypted backup/restore to confirm each theme persists. Older app versions cannot restore backups containing a newly added theme name; use 0.4.1 or newer for those backups.

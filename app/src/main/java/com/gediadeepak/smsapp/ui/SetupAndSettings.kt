@@ -3,6 +3,9 @@ package com.gediadeepak.smsapp.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -161,6 +164,9 @@ private fun SettingsSection(title: String, summary: String, expanded: Boolean, o
 @Composable
 private fun ThemeOptions(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     Column { ThemeMode.entries.forEach { mode ->
-        Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = selected == mode, onClick = { onSelect(mode) }); TextButton(onClick = { onSelect(mode) }) { Text(mode.label) } }
+        Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = selected == mode, onClick = { onSelect(mode) }); TextButton(onClick = { onSelect(mode) }) {
+                Box(Modifier.size(20.dp).background(sandeshColors(mode).primary, CircleShape).border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape))
+                Spacer(Modifier.width(10.dp)); Text(mode.label)
+            } }
     } }
 }

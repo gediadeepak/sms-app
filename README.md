@@ -33,7 +33,7 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 - Recoverable **Spam** folder, manual **Move to Spam**, sender blocking and **Settings → Spam & blocked senders → Blocked senders**. Blocked/spam SMS remains in Android's store and is silent inside Sandesh. Restore/unblock brings conversations back; calls and other apps are unaffected. No automatic AI spam classifier is included.
 - Optional **Settings → Headset readout** on Android 9+: choose an audio device, enable sender-only announcements, then use **Read message** in a notification or the message's speaker button for its body. Uses an installed offline TTS voice, a Stop control and route/disconnection checks. Headset settings are device-specific and excluded from backups. See [spam and headset guide](docs/SPAM_AND_HEADSET.md).
 - SQLite app database for starred/archived flags, aliases, send-part receipts and pending incoming SMS. Actual SMS remains in Android's system store.
-- Three saved themes: **Blue & white** (default), **Green & white**, and **Black & white**.
+- Six saved themes: **Blue & white** (default), **Green & white**, **Black & white**, **Purple & white**, **Rose & white**, and **Amber & white**.
 - A theme-tinted, transparent winged-envelope-and-hand logo, adaptive launcher icon and the supplied flying GIF as the splash. The supporting hand, envelope and animated wordmark are preserved. Playback follows Android's animation-duration setting.
 - Search, unread/starred/archived folders, drafts during the current app process, external `sms:`/`smsto:` compose intents and optional offline reply examples.
 - Optional Firebase email registration/login, email verification, password-reset emails and Google sign-in integration. Version 0.3.1 includes the supplied web OAuth client configuration; provider enablement and signing fingerprints still need to match the installed build. See [Firebase setup](docs/FIREBASE_SETUP.md).
@@ -68,7 +68,7 @@ See the [physical-device test plan](docs/DEVICE_TEST_PLAN.md), [privacy notes](d
 - `app/.../data`: SQLite metadata and pending receipts; private settings.
 - `app/.../account`: Firebase Authentication, Credential Manager and account/backup state.
 - `app/.../backup`: validated SMS snapshots, non-destructive provider restore and encrypted Firestore chunks.
-- `app/.../ui`: Compose screens, three themes, branding and splash.
+- `app/.../ui`: Compose screens, six themes, branding and splash.
 - `SandeshViewModel`: inbox state, drafts, provider observation and background work.
 - `core`: Android-independent domain models, SIM selection and multipart-status rules, authenticated backup encryption, offline reply interface and unit tests. Currently Kotlin/JVM, not KMP/iOS yet.
 

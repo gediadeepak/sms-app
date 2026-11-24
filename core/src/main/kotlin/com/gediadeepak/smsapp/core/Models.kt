@@ -3,7 +3,7 @@ package com.gediadeepak.smsapp.core
 enum class SimLine(val defaultLabel: String, val slot: Int) { PERSONAL("Personal", 1), WORK("Work", 2), UNKNOWN("Unknown SIM", 0) }
 enum class Folder(val label: String) { INBOX("Inbox"), UNREAD("Unread"), STARRED("Starred"), ARCHIVED("Archived"), SPAM("Spam") }
 enum class Delivery { RECEIVED, SENDING, SENT, DELIVERED, FAILED, UNDELIVERED, UNKNOWN }
-enum class ThemeMode(val label: String) { BLUE("Blue & white"), GREEN("Green & white"), DARK("Black & white") }
+enum class ThemeMode(val label: String) { BLUE("Blue & white"), GREEN("Green & white"), DARK("Black & white"), PURPLE("Purple & white"), ROSE("Rose & white"), AMBER("Amber & white") }
 data class DeviceSim(val subscriptionId: Int, val slotIndex: Int, val displayName: String, val carrier: String) {
     val line get() = when (slotIndex) { 0 -> SimLine.PERSONAL; 1 -> SimLine.WORK; else -> SimLine.UNKNOWN }
     val label get() = "SIM ${slotIndex + 1} · $displayName"

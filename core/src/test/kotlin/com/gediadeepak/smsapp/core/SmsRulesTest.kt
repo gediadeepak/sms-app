@@ -4,9 +4,10 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SmsRulesTest {
-    @Test fun `three appearance choices default to blue and white`() {
+    @Test fun `appearance choices preserve saved names and default to blue and white`() {
         assertEquals(ThemeMode.BLUE, Preferences().theme)
-        assertEquals(listOf(ThemeMode.BLUE, ThemeMode.GREEN, ThemeMode.DARK), ThemeMode.entries.toList())
+        listOf("BLUE", "GREEN", "DARK").forEach { assertEquals(it, ThemeMode.valueOf(it).name) }
+        assertEquals(listOf(ThemeMode.BLUE, ThemeMode.GREEN, ThemeMode.DARK, ThemeMode.PURPLE, ThemeMode.ROSE, ThemeMode.AMBER), ThemeMode.entries.toList())
     }
     @Test fun `dual SIM requires a choice when no default exists`() {
         assertNull(resolveSendingSubscription(null, listOf(7, 18)))
