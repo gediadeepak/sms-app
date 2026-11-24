@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#245c46">
+  <meta name="description" content="Relay — a working, local SMS app prototype with two lines and a little assistance.">
+  <title>Relay — SMS, thoughtfully organised</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <svg class="svg-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2V11.5A8.5 8.5 0 0 1 10.5 3h2a8.5 8.5 0 0 1 8.5 8.5Z"/><path d="M7 9h9M7 13h6"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24"><path d="m4 4-3 11v5h22v-5L20 4ZM1 15h6l2 3h6l2-3h6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><path d="M4 8v13h16V8M3 3h18v5H3ZM9 12h6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="m10 3-.5 2-2 .9-1.9-.6-2 3.4L5 10v3l-1.4 1.3 2 3.4 1.9-.6 2 .9.5 2h4l.5-2 2-.9 1.9.6 2-3.4L19 13v-3l1.4-1.3-2-3.4-1.9.6-2-.9-.5-2Z"/><circle cx="12" cy="11.5" r="3"/></symbol>
+    <symbol id="i-sim" viewBox="0 0 24 24"><path d="m9 2-5 5v15h16V2ZM8 11h8v7H8ZM12 11v7M8 14.5h8"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.7 6.3L21 12l-6.3 2.7L12 21l-2.7-6.3L3 12l6.3-2.7ZM20 2v4M18 4h4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-double" viewBox="0 0 24 24"><path d="m2 12 4 4L16 6M10 14l2 2L22 6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m14 5-7 7 7 7"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m16 3 5 5-12 12-6 1 1-6ZM13 6l5 5"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M5 9a7 7 0 0 1 14 0v7l2 2H3l2-2ZM9 21h6"/></symbol>
+  </defs></svg>
+
+  <div class="app-shell" id="appShell">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+      <a class="brand" href="./" aria-label="Relay home"><span class="brand-mark"><svg><use href="#i-message"/></svg></span>relay<span class="brand-period">.</span></a>
+      <div class="workspace-label">YOUR EVERYDAY, CONNECTED</div>
+      <button class="primary new-message" data-action="new"><svg><use href="#i-plus"/></svg>New message<span class="shortcut">N</span></button>
+      <nav class="navigation">
+        <button class="nav-item active" data-view="inbox"><svg><use href="#i-inbox"/></svg>Inbox<span id="inboxCount" class="nav-count">3</span></button>
+        <button class="nav-item" data-view="unread"><svg><use href="#i-message"/></svg>Unread<span id="unreadCount" class="subtle-count">3</span></button>
+        <button class="nav-item" data-view="starred"><svg><use href="#i-star"/></svg>Starred</button>
+        <button class="nav-item" data-view="archived"><svg><use href="#i-archive"/></svg>Archived</button>
+      </nav>
+      <div class="sidebar-section-title">YOUR LINES<span class="tiny-label">DUAL SIM</span></div>
+      <button class="line-card personal" data-line="personal"><span class="line-icon"><svg><use href="#i-sim"/></svg></span><span><strong data-personal-label>Personal</strong><small>•••• 4821 · SIM 1</small></span><span class="connected-dot" title="Demo line available"></span></button>
+      <button class="line-card work" data-line="work"><span class="line-icon"><svg><use href="#i-sim"/></svg></span><span><strong data-work-label>Work</strong><small>•••• 0936 · SIM 2</small></span><span class="connected-dot" title="Demo line available"></span></button>
+      <button class="show-all-lines" id="allLines">Show both lines</button>
+      <div class="sidebar-bottom">
+        <div class="quiet-note"><svg><use href="#i-lock"/></svg><span>Your conversations stay<br>in this browser.</span></div>
+        <button class="nav-item" data-action="settings"><svg><use href="#i-settings"/></svg>Settings</button>
+        <div class="profile"><span class="avatar profile-avatar">DP</span><span><strong>Deepak</strong><small>Personal workspace</small></span><span class="profile-check"><svg><use href="#i-check"/></svg></span></div>
+      </div>
+    </aside>
+    <button class="sidebar-scrim" id="sidebarScrim" aria-label="Close navigation"></button>
+
+    <main class="main-workspace">
+      <header class="workspace-header"><div class="page-heading"><button class="icon-button mobile-menu" id="menuButton" aria-label="Open navigation"><svg><use href="#i-menu"/></svg></button><span class="eyebrow">A LITTLE LESS NOISE. A LOT MORE CONNECTION.</span><h1>Messages<span class="heading-dot">.</span></h1></div><div class="header-right"><span class="prototype-tag">Interactive prototype</span><button class="icon-button" data-action="settings" aria-label="Open settings"><svg><use href="#i-settings"/></svg></button></div></header>
+      <div class="workspace-content">
+        <section class="conversation-list" aria-label="Conversations">
+          <div class="list-heading"><div><h2 id="listTitle">All messages</h2><p id="listSubtitle">Two lines. One happy inbox.</p></div><button class="icon-button" data-action="new" aria-label="New conversation"><svg><use href="#i-edit"/></svg></button></div>
+          <label class="search-box"><svg><use href="#i-search"/></svg><input id="search" type="search" placeholder="Search conversations" autocomplete="off" aria-label="Search conversations"><span class="search-key">/</span></label>
+          <div class="filter-tabs" role="group" aria-label="Filter by line"><button class="active" data-filter="all">All lines</button><button data-filter="personal"><span class="line-dot personal-dot"></span><span data-personal-label>Personal</span></button><button data-filter="work"><span class="line-dot work-dot"></span><span data-work-label>Work</span></button></div>
+          <div class="list-section-label">CONVERSATIONS<span id="conversationCount"></span></div>
+          <div id="conversationItems" class="conversation-items"></div>
+          <div class="list-footer"><svg><use href="#i-check"/></svg>All caught up with your two lines.</div>
+        </section>
+
+        <section class="thread" id="thread" aria-label="Selected conversation">
+          <div id="threadHeader" class="thread-header"></div>
+          <div class="thread-line-bar" id="threadLineBar"></div>
+          <div id="messages" class="messages" role="log" aria-live="polite" aria-label="Messages"></div>
+          <div id="composerArea" class="composer-area">
+            <div class="suggested-row"><span><svg><use href="#i-spark"/></svg>A little help replying</span><button id="quickSuggest">Show suggestions</button></div>
+            <div class="composer"><label class="sr-only" for="messageInput">Message</label><textarea id="messageInput" placeholder="Write something thoughtful…" rows="2" maxlength="1600"></textarea><div class="composer-toolbar"><label class="send-line-label" for="sendLine"><svg><use href="#i-sim"/></svg><select id="sendLine" aria-label="SIM to send from"></select><svg class="select-chevron"><use href="#i-chevron"/></svg></label><div class="composer-actions"><button class="icon-button rewrite-button" id="rewriteButton" aria-label="Polish draft with demo assistant" title="Polish draft"><svg><use href="#i-spark"/></svg></button><button id="sendButton" class="primary send-button">Send<svg><use href="#i-message"/></svg></button></div></div></div>
+            <div class="composer-footnote"><span id="messageCounter">SMS · 0 characters</span><span>Enter to send · Shift + Enter for a new line</span></div>
+          </div>
+        </section>
+
+        <aside class="assistant-panel" id="assistantPanel" aria-label="Demo AI assistant">
+          <div class="assistant-header"><span class="assistant-logo"><svg><use href="#i-spark"/></svg></span><div><h2>A little assistance</h2><p>Find the words. Keep your voice.</p></div><button class="icon-button assistant-close" id="closeAssistant" aria-label="Close assistant"><svg><use href="#i-close"/></svg></button></div>
+          <div class="assistant-inner"><span class="assistant-badge">DEMO ASSISTANT</span><h3>Good conversations<br>start with you.</h3><p class="assistant-description">A starting point for your next reply, whenever you need one.</p>
+            <div class="assistant-tabs"><button class="active" data-assist="replies">Reply ideas</button><button data-assist="summary">Summary</button></div>
+            <div id="replyTools"><label class="tone-label" for="tone">Make it sound like you</label><div class="tone-select"><select id="tone"><option value="friendly">Friendly & natural</option><option value="concise">Short & sweet</option><option value="professional">Professional</option></select><svg><use href="#i-chevron"/></svg></div></div>
+            <div id="assistantOutput"></div>
+            <button class="generate-button" id="generateButton"><svg><use href="#i-spark"/></svg>Refresh ideas</button>
+            <div class="assistant-tip"><span class="tip-icon"><svg><use href="#i-edit"/></svg></span><p><strong>A suggestion, never a send.</strong>Tap an idea to add it to your draft. Make it yours before sending.</p></div>
+          </div>
+          <div class="assistant-footer"><svg><use href="#i-lock"/></svg>Sample suggestions · no AI service connected</div>
+        </aside>
+      </div>
+      <footer class="demo-footer"><span><span class="demo-dot"></span>Made for two lines. Designed for you.</span><span>Demo only · no real SMS sent</span></footer>
+    </main>
+  </div>
+
+  <dialog id="newDialog"><form id="newForm"><div class="dialog-heading"><div><span class="eyebrow">START A CONVERSATION</span><h2>A simple hello.</h2></div><button type="button" class="icon-button" data-close="newDialog" aria-label="Close"><svg><use href="#i-close"/></svg></button></div><label class="field-label" for="contactName">Name <span>(optional)</span></label><input id="contactName" class="text-field" maxlength="60" placeholder="e.g. Jamie Wilson"><label class="field-label" for="contactNumber">Phone number</label><input id="contactNumber" class="text-field" type="tel" required pattern="\+?[0-9 \(\)\-]{6,22}" placeholder="e.g. +44 7700 900123" title="Enter 6–22 characters using digits, spaces, parentheses or hyphens, with an optional leading +."><label class="field-label" for="newLine">Send from</label><select id="newLine" class="text-field"><option value="personal">Personal · SIM 1</option><option value="work">Work · SIM 2</option></select><p class="dialog-note">This creates a demo conversation. No real number will be contacted.</p><button type="submit" class="primary full-width">Start conversation</button></form></dialog>
+
+  <dialog id="settingsDialog"><form id="settingsForm"><div class="dialog-heading"><div><span class="eyebrow">MAKE YOURSELF AT HOME</span><h2>Your workspace.</h2></div><button type="button" class="icon-button" data-close="settingsDialog" aria-label="Close"><svg><use href="#i-close"/></svg></button></div><label class="field-label" for="personalName">SIM 1 label</label><input id="personalName" class="text-field" maxlength="18" required><label class="field-label" for="workName">SIM 2 label</label><input id="workName" class="text-field" maxlength="18" required><label class="field-label" for="defaultLine">Default line for new conversations</label><select id="defaultLine" class="text-field"><option value="personal">SIM 1</option><option value="work">SIM 2</option></select><label class="toggle-setting"><span><strong>Reply suggestions</strong><small>Show the offline demo assistant</small></span><input id="enableAssistant" type="checkbox" role="switch"></label><button class="primary full-width" type="submit">Save preferences</button><div class="demo-tools"><span class="eyebrow">PROTOTYPE TOOLS</span><button type="button" id="simulateIncoming" class="secondary full-width"><svg><use href="#i-message"/></svg>Simulate an incoming message</button><button type="button" id="resetDemo" class="text-button">Reset demo conversations</button></div></form></dialog>
+
+  <dialog id="resetDialog"><div class="dialog-heading"><h2>Start fresh?</h2><button class="icon-button" data-close="resetDialog" aria-label="Close"><svg><use href="#i-close"/></svg></button></div><p class="dialog-note">This removes your local demo messages and preferences, then restores the sample inbox.</p><div class="dialog-actions"><button class="secondary" data-close="resetDialog">Keep my messages</button><button class="primary" id="confirmReset">Reset demo</button></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

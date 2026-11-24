@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.Relay" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#245C46</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">#F5F7F3</item>
+    </style>
+</resources>
