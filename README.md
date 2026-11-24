@@ -27,6 +27,7 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 - Real SMS inbox from Android's system SMS provider, including unread state and per-message subscription IDs.
 - Actual active SIM/eSIM detection. **Settings → Default sending SIM** supports a specific active SIM or **Ask every time**. The composer always shows the selected line. With multiple SIMs and no default, choose before every send. A removed saved SIM never silently falls back to another line.
 - Real subscription-specific multipart SMS submission, persistent per-part result tracking, incoming SMS persistence and notifications. “Delivered” requires carrier delivery reports; it is never simulated. No automatic retries.
+- Notification permission is requested once after SMS setup on Android 13+. If blocked, an inbox warning and Settings show whether permission, app notifications or the Messages channel need enabling. Settings includes a local test alert. Obscured/background conversations are not automatically marked read.
 - SQLite app database for starred/archived flags, aliases, send-part receipts and pending incoming SMS. Actual SMS remains in Android's system store.
 - Three saved themes: **Blue & white** (default), **Green & white**, and **Black & white**.
 - A theme-tinted, transparent winged-envelope-and-hand logo, adaptive launcher icon and the supplied flying GIF as the splash. The supporting hand, envelope and animated wordmark are preserved. Playback follows Android's animation-duration setting.

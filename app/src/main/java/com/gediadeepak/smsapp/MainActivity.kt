@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.Manifest
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,6 +22,8 @@ import com.gediadeepak.smsapp.ui.SandeshApp
 import com.gediadeepak.smsapp.ui.SandeshTheme
 import com.gediadeepak.smsapp.ui.SandeshSplash
 import com.gediadeepak.smsapp.telephony.SmsAccess
+import com.gediadeepak.smsapp.telephony.SmsNotifications
+import com.gediadeepak.smsapp.telephony.SmsNotificationStatus
 import com.gediadeepak.smsapp.account.AccountViewModel
 import com.gediadeepak.smsapp.ui.AccountBackupFlow
 import com.gediadeepak.smsapp.ui.AccountDestination
@@ -32,6 +35,8 @@ class MainActivity : ComponentActivity() {
     private val restoreLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> account.selectRestoreFile(uri) }
     private var pendingIntent by mutableStateOf<Intent?>(null)
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { model.refresh() }
+    private val notificationLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { model.refresh() }
+    private val notificationPrompts by lazy { getSharedPreferences("sandesh_permission_prompts", MODE_PRIVATE) }
     private val roleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (SmsAccess.isDefault(this)) requestSmsPermissions()
         model.refresh()
@@ -41,12 +46,19 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         model = ViewModelProvider(this)[SandeshViewModel::class.java]
         account = ViewModelProvider(this)[AccountViewModel::class.java]
+        SmsNotifications.ensureChannel(this)
         pendingIntent = intent.takeIf { it.action == Intent.ACTION_SENDTO || it.hasExtra("thread_id") }
         setContent {
             val state by model.state.collectAsStateWithLifecycle()
             val accountState by account.state.collectAsStateWithLifecycle()
             var accountDestination by rememberSaveable { mutableStateOf<AccountDestination?>(null) }
             var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
+            LaunchedEffect(state.ready, showSplash, accountDestination) {
+                if (state.ready && !showSplash && accountDestination == null && Build.VERSION.SDK_INT >= 33 && !notificationPrompts.getBoolean("notification_requested", false)) {
+                    if (SmsAccess.allowed(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS)) notificationPrompts.edit().putBoolean("notification_requested", true).apply()
+                    else requestNotifications()
+                }
+            }
             LaunchedEffect(accountState.exportRequest) {
                 if (accountState.exportRequest != null) {
                     account.exportRequestHandled()
@@ -68,7 +80,8 @@ class MainActivity : ComponentActivity() {
             SandeshTheme(state.preferences.theme) {
                 Box(Modifier.fillMaxSize()) {
                     SandeshApp(model, ::setupSms, ::openAppSettings, ::requestNotifications,
-                        onAccount = { accountDestination = AccountDestination.ACCOUNT }, onBackup = { accountDestination = AccountDestination.BACKUP })
+                        onAccount = { accountDestination = AccountDestination.ACCOUNT }, onBackup = { accountDestination = AccountDestination.BACKUP },
+                        onTestNotifications = ::testNotifications)
                     accountDestination?.let { start -> AccountBackupFlow(account, start, state.ready,
                         onPickRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onDismiss = { accountDestination = null }) }
                     if (showSplash) SandeshSplash { showSplash = false }
@@ -77,6 +90,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     override fun onResume() { super.onResume(); if (::model.isInitialized) model.setForeground(true) }
+    override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (::model.isInitialized) model.setWindowFocused(hasFocus) }
     override fun onPause() { if (::model.isInitialized) model.setForeground(false); super.onPause() }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); pendingIntent = intent }
     private fun setupSms() {
@@ -89,7 +103,18 @@ class MainActivity : ComponentActivity() {
         if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray()) else model.refresh()
     }
     private fun requestNotifications() {
-        if (Build.VERSION.SDK_INT >= 33 && !SmsAccess.allowed(this, Manifest.permission.POST_NOTIFICATIONS)) permissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+        SmsNotifications.ensureChannel(this)
+        if (Build.VERSION.SDK_INT >= 33 && !SmsAccess.allowed(this, Manifest.permission.POST_NOTIFICATIONS)
+            && (!notificationPrompts.getBoolean("notification_requested", false) || shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS))) {
+            notificationPrompts.edit().putBoolean("notification_requested", true).apply()
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else try { startActivity(SmsNotifications.settingsIntent(this)) }
+        catch (_: Exception) { openAppSettings() }
+    }
+    private fun testNotifications() {
+        if (SmsNotifications.status(this) != SmsNotificationStatus.ENABLED) { requestNotifications(); return }
+        if (SmsNotifications.test(this)) Toast.makeText(this, "Test alert requested. Swipe down to check your notification panel.", Toast.LENGTH_LONG).show()
+        else model.reportError("Android blocked the test notification. Check Sandesh’s notification settings.")
     }
     private fun openAppSettings() { startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))) }
 }

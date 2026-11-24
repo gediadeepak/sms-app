@@ -10,6 +10,10 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 - Revoke SMS or phone-state access while running; the app returns to setup and stops accessing the inbox. Restore access and verify recovery.
 - Change the default SMS app away from Sandesh and back. Verify role changes are detected.
 - Open a thread, receive a message while foreground/background, and check read/unread handling and privacy-safe notifications. Tap notifications and verify the right thread opens.
+- On Android 13+, finish SMS setup and verify the one-time notification permission prompt appears after the splash. Deny it: SMS keeps working and the inbox shows an Enable action. Grant it: the warning disappears after returning to the app.
+- Block Sandesh notifications at app level, then block just the Messages channel. Settings must show the correct blocked state and Enable must open the applicable Android notification settings. Already-granted permission must still allow opening channel settings.
+- Use Settings → Send test notification; verify a clearly labelled test alert appears in the Android notification panel and tapping it opens Sandesh. Check Android sound/pop-up/DND settings separately from delivery to the panel.
+- Receive SMS while a conversation is obscured by the app drawer, settings, account screen, or Android notification panel. It must not be marked read or have its notification cleared until the conversation is visible again. Repeat in the background and with the screen locked.
 
 ## SIM choice and sending
 

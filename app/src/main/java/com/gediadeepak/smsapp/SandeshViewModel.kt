@@ -23,6 +23,7 @@ data class InboxState(
     val sendSubscriptionId: Int? = null, val subscriptions: List<DeviceSim> = emptyList(),
     val defaultSms: Boolean = false, val permissionsGranted: Boolean = false, val hasTelephony: Boolean = true,
     val loading: Boolean = false, val sending: Boolean = false, val error: String? = null, val pendingMms: Int = 0,
+    val notificationStatus: SmsNotificationStatus = SmsNotificationStatus.ENABLED,
 ) {
     val selected get() = conversations.find { it.id == selectedId }
     val visible get() = filterConversations(conversations, folder, filterLine, query)
@@ -57,7 +58,12 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     private var subscriptionListenerRegistered = false
     private var observerRegistered = false
     private var foreground = false
+    private var windowFocused = false
+    private var contentOverlayVisible = false
     private var accountVisible = false
+    private fun conversationVisible() = foreground && windowFocused && !accountVisible && !contentOverlayVisible
+    fun setWindowFocused(value: Boolean) { windowFocused = value; if (value) refresh() }
+    fun setContentOverlayVisible(value: Boolean) { contentOverlayVisible = value; if (!value) refresh() }
     fun setAccountVisible(value: Boolean) { accountVisible = value; if (!value) refresh() }
     fun setForeground(value: Boolean) { foreground = value; if (value) refresh() }
     private val subscriptionListener = object : SubscriptionManager.OnSubscriptionsChangedListener() { override fun onSubscriptionsChanged() { refresh() } }
@@ -77,9 +83,10 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             val default = SmsAccess.isDefault(context)
             val ready = SmsAccess.ready(context)
             val sims = SmsAccess.subscriptions(context)
+            val notificationStatus = SmsNotifications.status(context)
             mutableState.update { current ->
                 val id = current.sendSubscriptionId?.takeIf { id -> sims.any { it.subscriptionId == id } }
-                current.copy(defaultSms = default, permissionsGranted = ready, subscriptions = sims,
+                current.copy(defaultSms = default, permissionsGranted = ready, subscriptions = sims, notificationStatus = notificationStatus,
                     hasTelephony = SmsAccess.hasTelephony(context), loading = ready, sendSubscriptionId = id,
                     sendLine = sims.find { it.subscriptionId == id }?.line ?: SimLine.UNKNOWN,
                     conversations = if (ready) current.conversations else emptyList())
@@ -92,7 +99,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val result = withContext(Dispatchers.IO) { repository.drainPendingIncoming(); repository.load(sims) to database.pendingMmsCount() }
                 if (version != refreshVersion || !SmsAccess.ready(context)) return@launch
-                val visibleThread = state.value.selectedId.takeIf { foreground && !accountVisible }
+                val visibleThread = state.value.selectedId.takeIf { conversationVisible() }
                 if (result.first.any { it.id == visibleThread && it.unread > 0 }) withContext(Dispatchers.IO) { repository.markRead(visibleThread!!) }
                 mutableState.update { it.copy(conversations = result.first.map { c -> if (c.id == visibleThread) c.copy(unread = 0) else c } + emptyThreads.values.filter { draft -> result.first.none { loaded -> loaded.id == draft.id } }, loading = false, pendingMms = result.second) }
             } catch (e: CancellationException) { throw e }
@@ -104,13 +111,14 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     fun select(id: String) {
         rememberDraft()
         if (state.value.conversations.none { it.id == id }) return
+        val visible = conversationVisible()
         val stored = drafts[id]
         val ids = state.value.subscriptions.map { it.subscriptionId }
         val subscription = if (stored != null) stored.second?.takeIf { it in ids } else resolveSendingSubscription(state.value.preferences.defaultSubscriptionId, ids)
         mutableState.update { it.copy(selectedId = id, draft = stored?.first.orEmpty(), sendSubscriptionId = subscription,
             sendLine = it.subscriptions.find { sim -> sim.subscriptionId == subscription }?.line ?: SimLine.UNKNOWN,
-            conversations = it.conversations.map { item -> if (item.id == id) item.copy(unread = 0) else item }) }
-        viewModelScope.launch(Dispatchers.IO) { runCatching { repository.markRead(id) } }
+            conversations = it.conversations.map { item -> if (item.id == id && visible) item.copy(unread = 0) else item }) }
+        if (visible) viewModelScope.launch(Dispatchers.IO) { runCatching { repository.markRead(id) } }
     }
     fun back() { rememberDraft(); mutableState.update { it.copy(selectedId = null, draft = "", sendSubscriptionId = null) } }
     fun folder(folder: Folder) { back(); mutableState.update { it.copy(folder = folder) } }

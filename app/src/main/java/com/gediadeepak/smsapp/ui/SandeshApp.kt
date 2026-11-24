@@ -39,6 +39,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gediadeepak.smsapp.InboxState
 import com.gediadeepak.smsapp.SandeshViewModel
+import com.gediadeepak.smsapp.telephony.SmsNotificationStatus
 import com.gediadeepak.smsapp.core.*
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -46,13 +47,16 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
-fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings: () -> Unit = {}, onNotifications: () -> Unit = {}, onAccount: () -> Unit = {}, onBackup: () -> Unit = {}) {
+fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings: () -> Unit = {}, onNotifications: () -> Unit = {}, onAccount: () -> Unit = {}, onBackup: () -> Unit = {}, onTestNotifications: () -> Unit = {}) {
     val state by model.state.collectAsStateWithLifecycle()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var newMessage by rememberSaveable { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
     var assistant by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(drawer.currentValue, drawer.targetValue, newMessage, settings, assistant) {
+        model.setContentOverlayVisible(drawer.isOpen || drawer.targetValue == DrawerValue.Open || newMessage || settings || assistant)
+    }
     if (state.error != null) AlertDialog(onDismissRequest = model::clearError, title = { Text("Sandesh needs attention") }, text = { Text(state.error.orEmpty()) }, confirmButton = { TextButton(onClick = model::clearError) { Text("OK") } })
     if (!state.ready) {
         SmsSetup(state, onSetup, onAppSettings, model::savePreferences, onAccount, onBackup)
@@ -101,7 +105,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))) {
                     if (wide || state.selectedId == null) {
                         Inbox(state, Modifier.then(if (wide) Modifier.width(330.dp) else Modifier.weight(1f)), model::select,
-                            model::search, model::filter, startMessage, compact = !wide)
+                            model::search, model::filter, startMessage, compact = !wide, onNotifications = onNotifications)
                     }
                     if (wide) VerticalDivider()
                     if (wide || state.selectedId != null) {
@@ -121,7 +125,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
         }
     }
     if (newMessage) NewConversationDialog(state, { name, number, id -> model.newConversation(name, number, id) }) { newMessage = false }
-    if (settings) SettingsDialog(state, onSave = { model.savePreferences(it); settings = false }, onNotifications = onNotifications, onAppSettings = onAppSettings,
+    if (settings) SettingsDialog(state, onSave = { model.savePreferences(it); settings = false }, onNotifications = onNotifications, onTestNotifications = onTestNotifications, onAppSettings = onAppSettings,
         onAccount = { settings = false; onAccount() }, onBackup = { settings = false; onBackup() }, onDismiss = { settings = false })
     if (assistant && state.selected != null && state.preferences.suggestions) Dialog(onDismissRequest = { assistant = false }) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -173,7 +177,7 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
 }
 
 @Composable
-private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> Unit, onSearch: (String) -> Unit, onFilter: (SimLine?) -> Unit, onNew: () -> Unit, compact: Boolean = true) {
+private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> Unit, onSearch: (String) -> Unit, onFilter: (SimLine?) -> Unit, onNew: () -> Unit, compact: Boolean = true, onNotifications: () -> Unit = {}) {
     Column(modifier.fillMaxHeight()) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -191,6 +195,13 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
             state.subscriptions.map { it.line }.distinct().forEach { line -> LineFilter(state.preferences.label(line), state.filterLine == line, line) { onFilter(line) } }
         }
         Row(Modifier.padding(horizontal = 22.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("CONVERSATIONS", color = Muted, fontSize = 10.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f)); Text(state.visible.size.toString().padStart(2, '0'), color = Muted, fontSize = 11.sp) }
+        if (state.notificationStatus != SmsNotificationStatus.ENABLED) {
+            Row(Modifier.fillMaxWidth().background(Sage).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.NotificationsOff, null, Modifier.size(18.dp), tint = Forest)
+                Text("SMS notifications are off", Modifier.weight(1f).padding(horizontal = 8.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                TextButton(onClick = onNotifications) { Text("Enable", fontSize = 12.sp) }
+            }
+        }
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (state.pendingMms > 0) Text("MMS received: attachments are unavailable. See Settings.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
         if (state.visible.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(if (state.query.isNotBlank()) "No matching conversations." else "A little space for new conversations.", Modifier.padding(24.dp), color = Muted, fontSize = 14.sp) }

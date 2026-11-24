@@ -1,6 +1,6 @@
 # Sandesh release preparation
 
-Version: 0.3.3 (code 6), application ID `com.sandesh.app`, minimum API 24, target API 37. The inbox uses compact two-line rows with numbered SIM icons before dates, and removes decorative phone footers to show more conversations. Account and Backup & restore have separate settings entries and focused pages. This installs separately from the earlier `com.gediadeepak.smsapp` candidate; private settings do not migrate automatically. System SMS remains available after permission setup. The supplied web OAuth client is included for Google sign-in; live sign-in still requires the correct Android signing fingerprint registered in Firebase.
+Version: 0.3.4 (code 7), application ID `com.sandesh.app`, minimum API 24, target API 37. Notification setup now includes a one-time Android 13+ permission prompt, app/channel status, working settings links and a local test alert. Messages are marked read automatically only when their conversation is visible in the focused foreground window. The inbox keeps its compact SIM icons and separate account/backup pages. This installs separately from the earlier `com.gediadeepak.smsapp` candidate; private settings do not migrate automatically. System SMS remains available after permission setup. Google sign-in still requires the correct signing fingerprint registered in Firebase.
 
 ## Build and signing
 

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gediadeepak.smsapp.InboxState
 import com.gediadeepak.smsapp.core.*
+import com.gediadeepak.smsapp.telephony.SmsNotificationStatus
 
 @Composable
 internal fun SmsSetup(state: InboxState, onSetup: () -> Unit, onAppSettings: () -> Unit, onPreferences: (Preferences) -> Unit, onAccount: () -> Unit, onBackup: () -> Unit) {
@@ -84,7 +85,7 @@ internal fun NewConversationDialog(state: InboxState, onCreate: (String, String,
 }
 
 @Composable
-internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onAppSettings: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onDismiss: () -> Unit) {
+internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onTestNotifications: () -> Unit, onAppSettings: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onDismiss: () -> Unit) {
     val preferences = state.preferences
     var personal by rememberSaveable { mutableStateOf(preferences.personalLabel) }; var work by rememberSaveable { mutableStateOf(preferences.workLabel) }
     var defaultId by rememberSaveable { mutableStateOf(preferences.defaultSubscriptionId) }; var suggestions by rememberSaveable { mutableStateOf(preferences.suggestions) }
@@ -101,7 +102,15 @@ internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, on
             LinePicker(defaultId, state.subscriptions, preferences.copy(personalLabel = personal, workLabel = work), { defaultId = it }, showAsk = true)
             Text("With multiple SIMs, Ask every time leaves sending disabled until you choose a line in the composer. If a saved SIM disappears, choose again.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)
             Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("Reply ideas", fontSize = 14.sp); Text("Offline samples · no AI connection", fontSize = 12.sp, color = Muted) }; Switch(checked = suggestions, onCheckedChange = { suggestions = it }) }
-            OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) { Text("Enable message notifications", fontSize = 12.sp) }
+            Text("Message notifications", fontWeight = FontWeight.Medium)
+            Text(when (state.notificationStatus) {
+                SmsNotificationStatus.ENABLED -> "On. Sound, pop-ups and lock-screen visibility follow your Android settings."
+                SmsNotificationStatus.PERMISSION_REQUIRED -> "Off. Allow notification permission to see new SMS alerts."
+                SmsNotificationStatus.APP_BLOCKED -> "Off. Android has blocked notifications for Sandesh."
+                SmsNotificationStatus.CHANNEL_BLOCKED -> "Off. The Messages notification category is disabled in Android."
+            }, fontSize = 12.sp, color = Muted, lineHeight = 21.sp)
+            OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) { Text(if (state.notificationStatus == SmsNotificationStatus.ENABLED) "Notification settings" else "Enable message notifications", fontSize = 12.sp) }
+            OutlinedButton(onClick = onTestNotifications, enabled = state.notificationStatus == SmsNotificationStatus.ENABLED, modifier = Modifier.fillMaxWidth()) { Text("Send test notification", fontSize = 12.sp) }
             TextButton(onClick = onAppSettings) { Text("Android permissions and settings", fontSize = 12.sp) }
             HorizontalDivider()
             Text("SMS only · MMS/RCS not supported. App flags and send receipts use a private SQLite database. SMS stays in Android’s system store; encrypted backups are available under Backup & restore.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)
