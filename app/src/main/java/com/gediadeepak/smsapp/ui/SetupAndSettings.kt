@@ -21,7 +21,7 @@ import com.gediadeepak.smsapp.InboxState
 import com.gediadeepak.smsapp.core.*
 
 @Composable
-internal fun SmsSetup(state: InboxState, onSetup: () -> Unit, onAppSettings: () -> Unit, onPreferences: (Preferences) -> Unit, onAccount: () -> Unit) {
+internal fun SmsSetup(state: InboxState, onSetup: () -> Unit, onAppSettings: () -> Unit, onPreferences: (Preferences) -> Unit, onAccount: () -> Unit, onBackup: () -> Unit) {
     Surface(color = Canvas, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.safeDrawingPadding().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Spacer(Modifier.height(24.dp)); SandeshLogo(Modifier.size(100.dp))
@@ -36,7 +36,8 @@ internal fun SmsSetup(state: InboxState, onSetup: () -> Unit, onAppSettings: () 
             if (!state.hasTelephony) Text("No cellular messaging hardware was detected. Use a phone with SMS support.", color = MaterialTheme.colorScheme.error)
             Button(onClick = onSetup, enabled = state.hasTelephony, modifier = Modifier.fillMaxWidth()) { Text(if (state.defaultSms) "Allow SMS and SIM permissions" else "Choose Sandesh as default SMS app") }
             TextButton(onClick = onAppSettings, modifier = Modifier.fillMaxWidth()) { Text("Open Android app settings") }
-            OutlinedButton(onClick = onAccount, modifier = Modifier.fillMaxWidth()) { Text("Account & backup") }
+            OutlinedButton(onClick = onAccount, modifier = Modifier.fillMaxWidth()) { Text("Account") }
+            OutlinedButton(onClick = onBackup, modifier = Modifier.fillMaxWidth()) { Text("Backup & restore") }
             Text("Appearance", fontWeight = FontWeight.Medium)
             ThemeOptions(state.preferences.theme) { onPreferences(state.preferences.copy(theme = it)) }
             Text("You can change your default messaging app in Android Settings at any time.", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
@@ -83,7 +84,7 @@ internal fun NewConversationDialog(state: InboxState, onCreate: (String, String,
 }
 
 @Composable
-internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onAppSettings: () -> Unit, onAccount: () -> Unit, onDismiss: () -> Unit) {
+internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onAppSettings: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onDismiss: () -> Unit) {
     val preferences = state.preferences
     var personal by rememberSaveable { mutableStateOf(preferences.personalLabel) }; var work by rememberSaveable { mutableStateOf(preferences.workLabel) }
     var defaultId by rememberSaveable { mutableStateOf(preferences.defaultSubscriptionId) }; var suggestions by rememberSaveable { mutableStateOf(preferences.suggestions) }
@@ -91,7 +92,8 @@ internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, on
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Your workspace.", fontWeight = FontWeight.SemiBold) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("MAKE YOURSELF AT HOME", fontSize = 11.sp, color = Muted)
-            OutlinedButton(onClick = onAccount, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.AccountCircle, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Account & backup") }
+            OutlinedButton(onClick = onAccount, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.AccountCircle, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Account") }
+            OutlinedButton(onClick = onBackup, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Backup, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Backup & restore") }
             Text("Appearance", fontWeight = FontWeight.Medium); ThemeOptions(theme) { theme = it }
             OutlinedTextField(value = personal, onValueChange = { personal = it.take(18) }, label = { Text("SIM 1 label") }, singleLine = true)
             OutlinedTextField(value = work, onValueChange = { work = it.take(18) }, label = { Text("SIM 2 label") }, singleLine = true)
@@ -102,7 +104,7 @@ internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, on
             OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) { Text("Enable message notifications", fontSize = 12.sp) }
             TextButton(onClick = onAppSettings) { Text("Android permissions and settings", fontSize = 12.sp) }
             HorizontalDivider()
-            Text("SMS only · MMS/RCS not supported. App flags and send receipts use a private SQLite database. SMS stays in Android’s system store; encrypted backups are available under Account & backup.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)
+            Text("SMS only · MMS/RCS not supported. App flags and send receipts use a private SQLite database. SMS stays in Android’s system store; encrypted backups are available under Backup & restore.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)
             if (state.pendingMms > 0) Text("${state.pendingMms} MMS notification(s) received. Raw notification data is retained, but attachments cannot be downloaded or displayed in this build. Switch back to a full messaging app for future MMS.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
         }
     }, confirmButton = { Button(onClick = { onSave(preferences.copy(personalLabel = personal.trim(), workLabel = work.trim(), defaultSubscriptionId = defaultId, suggestions = suggestions, theme = theme)) }, enabled = personal.isNotBlank() && work.isNotBlank()) { Text("Save preferences") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } })

@@ -44,7 +44,7 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 @Composable
-fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings: () -> Unit = {}, onNotifications: () -> Unit = {}, onAccount: () -> Unit = {}) {
+fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings: () -> Unit = {}, onNotifications: () -> Unit = {}, onAccount: () -> Unit = {}, onBackup: () -> Unit = {}) {
     val state by model.state.collectAsStateWithLifecycle()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -53,7 +53,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
     var assistant by rememberSaveable { mutableStateOf(false) }
     if (state.error != null) AlertDialog(onDismissRequest = model::clearError, title = { Text("Sandesh needs attention") }, text = { Text(state.error.orEmpty()) }, confirmButton = { TextButton(onClick = model::clearError) { Text("OK") } })
     if (!state.ready) {
-        SmsSetup(state, onSetup, onAppSettings, model::savePreferences, onAccount)
+        SmsSetup(state, onSetup, onAppSettings, model::savePreferences, onAccount, onBackup)
         return
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -120,7 +120,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
     }
     if (newMessage) NewConversationDialog(state, { name, number, id -> model.newConversation(name, number, id) }) { newMessage = false }
     if (settings) SettingsDialog(state, onSave = { model.savePreferences(it); settings = false }, onNotifications = onNotifications, onAppSettings = onAppSettings,
-        onAccount = { settings = false; onAccount() }, onDismiss = { settings = false })
+        onAccount = { settings = false; onAccount() }, onBackup = { settings = false; onBackup() }, onDismiss = { settings = false })
     if (assistant && state.selected != null && state.preferences.suggestions) Dialog(onDismissRequest = { assistant = false }) {
         Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Assistant(state, model, Modifier.fillMaxWidth().heightIn(max = 650.dp), onDismiss = { assistant = false }, onInsert = { assistant = false })

@@ -39,7 +39,7 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 1. Read the SMS-only limitations on setup before changing your default app.
 2. Choose Sandesh as the default SMS app, then grant SMS and phone-state access.
 3. In Settings, enable notifications and choose a default sending SIM or Ask every time.
-4. Choose your appearance. Optional account and backup features are in **Settings → Account & backup**. There is no AI API connection.
+4. Choose your appearance. **Settings → Account** opens the account overview, with separate login, registration and password-reset pages. **Settings → Backup & restore** opens separate file and cloud backup pages. Cloud sign-in returns to the cloud page after a verified login. There is no AI API connection.
 
 No seeded conversations are loaded by the Android app. Version 0.3.0 switches to the owner's release application ID **com.sandesh.app**. It installs separately from the earlier com.gediadeepak.smsapp build and does not inherit its private settings. Android's system SMS history remains available after granting access. Uninstalling Sandesh removes app metadata, but does not delete SMS held by Android's system SMS provider.
 
