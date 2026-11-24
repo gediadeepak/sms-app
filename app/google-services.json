@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "47632793502",
+    "project_id": "sandesh-sms-app",
+    "storage_bucket": "sandesh-sms-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:47632793502:android:33b09909add86f9c15a08f",
+        "android_client_info": {
+          "package_name": "com.sandesh.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfV9ithiZ4i8li-zC0Nofkr7aAxB9odgU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

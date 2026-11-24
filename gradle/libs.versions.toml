@@ -1,11 +1,17 @@
 [versions]
 agp = "9.5.1"
-kotlin = "2.2.10"
+kotlin = "2.4.21"
 composeBom = "2025.08.01"
 activity = "1.10.1"
 lifecycle = "2.9.2"
 coroutines = "1.10.2"
 junit = "4.13.2"
+bouncycastle = "1.87"
+firebaseBom = "35.2.0"
+googleServices = "4.6.0"
+credentials = "1.5.0"
+googleId = "1.1.1"
+fragment = "1.8.9"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
@@ -20,8 +26,18 @@ lifecycle-viewmodel = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", v
 lifecycle-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 junit = { module = "junit:junit", version.ref = "junit" }
+bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-auth = { module = "com.google.firebase:firebase-auth" }
+firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
+credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
+credentials-google = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
+fragment = { module = "androidx.fragment:fragment", version.ref = "fragment" }
+google-id = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleId" }
+coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }

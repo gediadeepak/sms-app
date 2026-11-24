@@ -21,9 +21,14 @@ import com.gediadeepak.smsapp.ui.SandeshApp
 import com.gediadeepak.smsapp.ui.SandeshTheme
 import com.gediadeepak.smsapp.ui.SandeshSplash
 import com.gediadeepak.smsapp.telephony.SmsAccess
+import com.gediadeepak.smsapp.account.AccountViewModel
+import com.gediadeepak.smsapp.ui.AccountScreen
 
 class MainActivity : ComponentActivity() {
     private lateinit var model: SandeshViewModel
+    private lateinit var account: AccountViewModel
+    private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri -> account.saveExport(uri) }
+    private val restoreLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> account.selectRestoreFile(uri) }
     private var pendingIntent by mutableStateOf<Intent?>(null)
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { model.refresh() }
     private val roleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -34,10 +39,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         model = ViewModelProvider(this)[SandeshViewModel::class.java]
+        account = ViewModelProvider(this)[AccountViewModel::class.java]
         pendingIntent = intent.takeIf { it.action == Intent.ACTION_SENDTO || it.hasExtra("thread_id") }
         setContent {
             val state by model.state.collectAsStateWithLifecycle()
+            val accountState by account.state.collectAsStateWithLifecycle()
+            var showAccount by rememberSaveable { mutableStateOf(false) }
             var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
+            LaunchedEffect(accountState.exportRequest) {
+                if (accountState.exportRequest != null) {
+                    account.exportRequestHandled()
+                    val stamp = java.text.SimpleDateFormat("yyyy-MM-dd-HHmm", java.util.Locale.UK).format(java.util.Date())
+                    exportLauncher.launch("Sandesh-$stamp.sandeshbackup")
+                }
+            }
+            LaunchedEffect(accountState.restoring, accountState.inboxChanged) { model.setRestoring(accountState.restoring, accountState.inboxChanged) }
+            LaunchedEffect(showAccount) { model.setAccountVisible(showAccount) }
             LaunchedEffect(state.ready, pendingIntent) {
                 val request = pendingIntent
                 if (state.ready && request != null) {
@@ -49,7 +66,8 @@ class MainActivity : ComponentActivity() {
             }
             SandeshTheme(state.preferences.theme) {
                 Box(Modifier.fillMaxSize()) {
-                    SandeshApp(model, ::setupSms, ::openAppSettings, ::requestNotifications)
+                    SandeshApp(model, ::setupSms, ::openAppSettings, ::requestNotifications, onAccount = { showAccount = true })
+                    if (showAccount) AccountScreen(account, state.ready, onPickRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onDismiss = { showAccount = false })
                     if (showSplash) SandeshSplash { showSplash = false }
                 }
             }

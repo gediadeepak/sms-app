@@ -43,9 +43,22 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     private val emptyThreads = mutableMapOf<String, Conversation>()
     private var refreshJob: Job? = null
     private var refreshVersion = 0
+    private var restoring = false
+    private var completedRestore = 0
+    fun setRestoring(value: Boolean, revision: Int) {
+        restoring = value
+        if (value) refreshJob?.cancel()
+        else if (revision != completedRestore) {
+            completedRestore = revision
+            mutableState.update { it.copy(preferences = preferences.load(), sendSubscriptionId = null, sendLine = SimLine.UNKNOWN) }
+            refresh()
+        }
+    }
     private var subscriptionListenerRegistered = false
     private var observerRegistered = false
     private var foreground = false
+    private var accountVisible = false
+    fun setAccountVisible(value: Boolean) { accountVisible = value; if (!value) refresh() }
     fun setForeground(value: Boolean) { foreground = value; if (value) refresh() }
     private val subscriptionListener = object : SubscriptionManager.OnSubscriptionsChangedListener() { override fun onSubscriptionsChanged() { refresh() } }
     private val observer = object : ContentObserver(Handler(Looper.getMainLooper())) { override fun onChange(selfChange: Boolean) { refresh() } }
@@ -56,6 +69,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun refresh() {
+        if (restoring) return
         val version = ++refreshVersion
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
@@ -78,7 +92,7 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val result = withContext(Dispatchers.IO) { repository.drainPendingIncoming(); repository.load(sims) to database.pendingMmsCount() }
                 if (version != refreshVersion || !SmsAccess.ready(context)) return@launch
-                val visibleThread = state.value.selectedId.takeIf { foreground }
+                val visibleThread = state.value.selectedId.takeIf { foreground && !accountVisible }
                 if (result.first.any { it.id == visibleThread && it.unread > 0 }) withContext(Dispatchers.IO) { repository.markRead(visibleThread!!) }
                 mutableState.update { it.copy(conversations = result.first.map { c -> if (c.id == visibleThread) c.copy(unread = 0) else c } + emptyThreads.values.filter { draft -> result.first.none { loaded -> loaded.id == draft.id } }, loading = false, pendingMms = result.second) }
             } catch (e: CancellationException) { throw e }

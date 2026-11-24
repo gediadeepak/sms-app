@@ -11,3 +11,8 @@ captures/
 build-validation.log
 .codex-attachments/
 release-validation.log
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+dependency-validation.log

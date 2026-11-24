@@ -21,7 +21,7 @@ import com.gediadeepak.smsapp.InboxState
 import com.gediadeepak.smsapp.core.*
 
 @Composable
-internal fun SmsSetup(state: InboxState, onSetup: () -> Unit, onAppSettings: () -> Unit, onPreferences: (Preferences) -> Unit) {
+internal fun SmsSetup(state: InboxState, onSetup: () -> Unit, onAppSettings: () -> Unit, onPreferences: (Preferences) -> Unit, onAccount: () -> Unit) {
     Surface(color = Canvas, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.safeDrawingPadding().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Spacer(Modifier.height(24.dp)); SandeshLogo(Modifier.size(100.dp))
@@ -31,11 +31,12 @@ internal fun SmsSetup(state: InboxState, onSetup: () -> Unit, onAppSettings: () 
             Surface(color = Sage, shape = MaterialTheme.shapes.medium) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Before you switch", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
                 Text("This build handles SMS only. MMS attachments, group MMS and RCS are not supported. Making Sandesh your default can affect those messages. Keep your previous messaging app installed.", fontSize = 14.sp, lineHeight = 23.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("Messages stay on this device. AI reply ideas are optional offline samples; no messages are sent to an AI service.", fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                Text("Messages stay on this device unless you choose encrypted backup. AI reply ideas are offline samples; no messages are sent to an AI service.", fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
             } }
             if (!state.hasTelephony) Text("No cellular messaging hardware was detected. Use a phone with SMS support.", color = MaterialTheme.colorScheme.error)
             Button(onClick = onSetup, enabled = state.hasTelephony, modifier = Modifier.fillMaxWidth()) { Text(if (state.defaultSms) "Allow SMS and SIM permissions" else "Choose Sandesh as default SMS app") }
             TextButton(onClick = onAppSettings, modifier = Modifier.fillMaxWidth()) { Text("Open Android app settings") }
+            OutlinedButton(onClick = onAccount, modifier = Modifier.fillMaxWidth()) { Text("Account & backup") }
             Text("Appearance", fontWeight = FontWeight.Medium)
             ThemeOptions(state.preferences.theme) { onPreferences(state.preferences.copy(theme = it)) }
             Text("You can change your default messaging app in Android Settings at any time.", color = Muted, fontSize = 12.sp, lineHeight = 20.sp)
@@ -82,7 +83,7 @@ internal fun NewConversationDialog(state: InboxState, onCreate: (String, String,
 }
 
 @Composable
-internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onAppSettings: () -> Unit, onDismiss: () -> Unit) {
+internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onAppSettings: () -> Unit, onAccount: () -> Unit, onDismiss: () -> Unit) {
     val preferences = state.preferences
     var personal by rememberSaveable { mutableStateOf(preferences.personalLabel) }; var work by rememberSaveable { mutableStateOf(preferences.workLabel) }
     var defaultId by rememberSaveable { mutableStateOf(preferences.defaultSubscriptionId) }; var suggestions by rememberSaveable { mutableStateOf(preferences.suggestions) }
@@ -90,6 +91,7 @@ internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, on
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Your workspace.", fontWeight = FontWeight.SemiBold) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("MAKE YOURSELF AT HOME", fontSize = 11.sp, color = Muted)
+            OutlinedButton(onClick = onAccount, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.AccountCircle, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Account & backup") }
             Text("Appearance", fontWeight = FontWeight.Medium); ThemeOptions(theme) { theme = it }
             OutlinedTextField(value = personal, onValueChange = { personal = it.take(18) }, label = { Text("SIM 1 label") }, singleLine = true)
             OutlinedTextField(value = work, onValueChange = { work = it.take(18) }, label = { Text("SIM 2 label") }, singleLine = true)
@@ -100,7 +102,7 @@ internal fun SettingsDialog(state: InboxState, onSave: (Preferences) -> Unit, on
             OutlinedButton(onClick = onNotifications, modifier = Modifier.fillMaxWidth()) { Text("Enable message notifications", fontSize = 12.sp) }
             TextButton(onClick = onAppSettings) { Text("Android permissions and settings", fontSize = 12.sp) }
             HorizontalDivider()
-            Text("SMS only · MMS/RCS not supported. No export or cloud backup yet. App flags and send receipts use a private SQLite database; SMS messages stay in Android’s system store.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)
+            Text("SMS only · MMS/RCS not supported. App flags and send receipts use a private SQLite database. SMS stays in Android’s system store; encrypted backups are available under Account & backup.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)
             if (state.pendingMms > 0) Text("${state.pendingMms} MMS notification(s) received. Raw notification data is retained, but attachments cannot be downloaded or displayed in this build. Switch back to a full messaging app for future MMS.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
         }
     }, confirmButton = { Button(onClick = { onSave(preferences.copy(personalLabel = personal.trim(), workLabel = work.trim(), defaultSubscriptionId = defaultId, suggestions = suggestions, theme = theme)) }, enabled = personal.isNotBlank() && work.isNotBlank()) { Text("Save preferences") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } })

@@ -2,16 +2,18 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+// Account features stay unavailable, without fake sign-in, until the owner's Firebase config is present.
+if (file("google-services.json").exists()) { apply(plugin = "com.google.gms.google-services") }
 
 android {
     namespace = "com.gediadeepak.smsapp"
     compileSdk { version = release(37) }
     defaultConfig {
-        applicationId = "com.gediadeepak.smsapp"
+        applicationId = "com.sandesh.app"
         minSdk = 24
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -49,6 +51,15 @@ dependencies {
     implementation(libs.lifecycle.viewmodel)
     implementation(libs.lifecycle.compose)
     implementation(libs.coroutines.android)
+    implementation(libs.coroutines.play.services)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.credentials)
+    implementation(libs.credentials.google)
+    // Google sign-in pulls in an older Fragment; Activity Result requires a modern version.
+    implementation(libs.fragment)
+    implementation(libs.google.id)
     debugImplementation(libs.compose.tooling)
     testImplementation(libs.junit)
 }

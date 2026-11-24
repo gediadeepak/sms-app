@@ -4,7 +4,7 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 
 ## Setup and reading
 
-- Install the debug APK over the earlier prototype. Verify no sample messages appear.
+- Install the com.sandesh.app APK (a separate install from the old package). Verify no sample messages appear and system SMS is available after granting access.
 - Decline the default role and permissions: the app stays on setup, with no SMS access.
 - Grant the default role, then permissions. Verify old inbox/sent messages appear, with correct unread state.
 - Revoke SMS or phone-state access while running; the app returns to setup and stops accessing the inbox. Restore access and verify recovery.
@@ -43,5 +43,18 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 
 - Receive an MMS indication: unsupported state must be visible, not represented as a successfully downloaded attachment.
 - Switch back to the previous messaging app to restore full MMS/RCS functionality for future messages.
-- Confirm AI suggestions are labelled samples and no network permissions or API secrets are present.
+- Confirm AI suggestions are labelled samples. Network access supports optional accounts/cloud backup; no AI or administrator secrets belong in the APK.
 - No physical-device results are claimed by this document. Record model, Android version, carrier, SIM arrangement, artifact hash and outcome for each executed test.
+
+## Accounts and backup
+
+- Register a disposable email account, verify its email, sign out and log in. Try invalid credentials, duplicate registration, offline mode and verification resend throttling. SMS must work without an account.
+- Request and complete a password reset, then sign in with the new password. The independent backup password must remain unchanged.
+- With OAuth configuration and signing fingerprints registered, exercise Google sign-in, cancellation, sign-out, restart and account switching on a Google Play services device. Test the signed release too.
+- Export Unicode/multipart SMS, stars, archives, aliases and all themes. Check the exported file contains no readable SMS. Save through local/cloud document providers and restore on another phone with the backup password.
+- Wrong password, truncated/corrupted files and oversized input must fail before changing SMS. Cancel file selection, password entry and restore preview; inbox stays unchanged.
+- Restore into empty and overlapping inboxes, then repeat: messages must not duplicate or disappear. Restored outbox/queued/failed records must never send. Historical SIMs show Unknown SIM; the sending default requires choosing again.
+- Revoke the default role during restore and test process death. Partial merges must be reported; retry must skip restored rows. Never erase current messages.
+- Back up with verified account A, then restore on another phone. Anonymous clients, unverified A and verified B must be denied access to A's Firestore paths by server rules, even when bypassing the Android UI.
+- Interrupt upload and confirm the previous published backup stays usable. Interrupt download and verify no provider writes. Test expired sign-in, missing rules/database and quota errors without false success notices.
+- Verify sign-out/uninstall do not imply remote deletion. Complete account/data deletion before store distribution.
