@@ -48,6 +48,10 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 
 ## Accounts and backup
 
+- Open the separate Account and Backup & restore settings entries. Login, registration, password reset, file backup and cloud backup must each show only their own controls. Check all three themes and large fonts.
+- Check toolbar Back and Android Back on every page. Passwords must clear when leaving a form or recreating the activity; the email can be retained. Cancel must never submit or restore.
+- From Cloud backup, sign in with an already verified account and confirm return to Cloud backup. For a new/unverified account, verify from Account, refresh and navigate back to Cloud backup. Sign-out must not erase SMS or backups.
+- Rotate during file selection, backup password entry and restore preview. The right page/dialog must return, passwords must not be restored, and no provider writes may happen until the explicit Restore confirmation.
 - Register a disposable email account, verify its email, sign out and log in. Try invalid credentials, duplicate registration, offline mode and verification resend throttling. SMS must work without an account.
 - Request and complete a password reset, then sign in with the new password. The independent backup password must remain unchanged.
 - With OAuth configuration and signing fingerprints registered, exercise Google sign-in, cancellation, sign-out, restart and account switching on a Google Play services device. Test the signed release too.

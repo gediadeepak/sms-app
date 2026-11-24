@@ -1,6 +1,6 @@
 # Sandesh release preparation
 
-Version: 0.3.1 (code 4), application ID `com.sandesh.app`, minimum API 24, target API 37. This installs separately from the earlier `com.gediadeepak.smsapp` candidate; private settings do not migrate automatically. System SMS remains available after permission setup. The supplied web OAuth client is included for Google sign-in; live sign-in still requires the correct Android signing fingerprint registered in Firebase.
+Version: 0.3.2 (code 5), application ID `com.sandesh.app`, minimum API 24, target API 37. Account and Backup & restore have separate settings entries and focused pages. This installs separately from the earlier `com.gediadeepak.smsapp` candidate; private settings do not migrate automatically. System SMS remains available after permission setup. The supplied web OAuth client is included for Google sign-in; live sign-in still requires the correct Android signing fingerprint registered in Firebase.
 
 ## Build and signing
 

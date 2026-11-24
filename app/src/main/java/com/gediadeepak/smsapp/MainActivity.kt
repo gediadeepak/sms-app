@@ -22,7 +22,8 @@ import com.gediadeepak.smsapp.ui.SandeshTheme
 import com.gediadeepak.smsapp.ui.SandeshSplash
 import com.gediadeepak.smsapp.telephony.SmsAccess
 import com.gediadeepak.smsapp.account.AccountViewModel
-import com.gediadeepak.smsapp.ui.AccountScreen
+import com.gediadeepak.smsapp.ui.AccountBackupFlow
+import com.gediadeepak.smsapp.ui.AccountDestination
 
 class MainActivity : ComponentActivity() {
     private lateinit var model: SandeshViewModel
@@ -44,7 +45,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by model.state.collectAsStateWithLifecycle()
             val accountState by account.state.collectAsStateWithLifecycle()
-            var showAccount by rememberSaveable { mutableStateOf(false) }
+            var accountDestination by rememberSaveable { mutableStateOf<AccountDestination?>(null) }
             var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
             LaunchedEffect(accountState.exportRequest) {
                 if (accountState.exportRequest != null) {
@@ -54,7 +55,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
             LaunchedEffect(accountState.restoring, accountState.inboxChanged) { model.setRestoring(accountState.restoring, accountState.inboxChanged) }
-            LaunchedEffect(showAccount) { model.setAccountVisible(showAccount) }
+            LaunchedEffect(accountDestination) { model.setAccountVisible(accountDestination != null) }
             LaunchedEffect(state.ready, pendingIntent) {
                 val request = pendingIntent
                 if (state.ready && request != null) {
@@ -66,8 +67,10 @@ class MainActivity : ComponentActivity() {
             }
             SandeshTheme(state.preferences.theme) {
                 Box(Modifier.fillMaxSize()) {
-                    SandeshApp(model, ::setupSms, ::openAppSettings, ::requestNotifications, onAccount = { showAccount = true })
-                    if (showAccount) AccountScreen(account, state.ready, onPickRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onDismiss = { showAccount = false })
+                    SandeshApp(model, ::setupSms, ::openAppSettings, ::requestNotifications,
+                        onAccount = { accountDestination = AccountDestination.ACCOUNT }, onBackup = { accountDestination = AccountDestination.BACKUP })
+                    accountDestination?.let { start -> AccountBackupFlow(account, start, state.ready,
+                        onPickRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onDismiss = { accountDestination = null }) }
                     if (showSplash) SandeshSplash { showSplash = false }
                 }
             }
