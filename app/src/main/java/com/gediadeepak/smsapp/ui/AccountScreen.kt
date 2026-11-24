@@ -2,6 +2,7 @@
 package com.gediadeepak.smsapp.ui
 
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -14,14 +15,13 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gediadeepak.smsapp.account.AccountState
 import com.gediadeepak.smsapp.account.AccountViewModel
@@ -66,52 +66,54 @@ fun AccountBackupFlow(model: AccountViewModel, startDestination: AccountDestinat
             model.restorePasswordHandled()
         }
     }
-    Dialog(onDismissRequest = ::back, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Scaffold(containerColor = Canvas, topBar = {
-            TopAppBar(title = { Text(destination.title, fontWeight = FontWeight.SemiBold) }, navigationIcon = {
-                IconButton(onClick = ::back, enabled = !busy) {
-                    if (destination == startDestination) Icon(Icons.Outlined.Close, "Close ${destination.title}")
-                    else Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back")
-                }
-            }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Canvas))
-        }) { padding ->
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
-                key(destination) {
-                    Column(Modifier.widthIn(max = 560.dp).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(22.dp),
-                        verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                        if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(state.busy.orEmpty(), color = Forest, fontSize = 14.sp) }
-                        state.notice?.let { AccountNotice(it, false, model::clearMessage) }
-                        state.error?.let { AccountNotice(it, true, model::clearMessage) }
-                        when (destination) {
-                            AccountDestination.ACCOUNT -> AccountHome(state, model,
-                                onLogin = { navigate(AccountDestination.LOGIN) }, onRegister = { navigate(AccountDestination.REGISTER) },
-                                onGoogle = { activity?.let(model::google) }, googleAvailable = activity != null)
-                            AccountDestination.LOGIN, AccountDestination.REGISTER, AccountDestination.RESET -> AccountForm(destination, state, model,
-                                email, { email = it }, ::navigate, onGoogle = { activity?.let(model::google) }, googleAvailable = activity != null)
-                            AccountDestination.BACKUP -> BackupHome(::navigate)
-                            AccountDestination.FILES -> FileBackupPage(smsReady, busy, onExport = { backupAction = BackupAction.EXPORT }, onRestore = onPickRestore)
-                            AccountDestination.CLOUD -> CloudBackupPage(state, smsReady,
-                                onBackup = { backupAction = BackupAction.CLOUD_BACKUP }, onRestore = { backupAction = BackupAction.CLOUD_RESTORE },
-                                onAccount = { accountReturn = AccountDestination.CLOUD; navigate(if (state.profile.uid == null) AccountDestination.LOGIN else AccountDestination.ACCOUNT) })
+    BackHandler(onBack = ::back)
+    Surface(modifier = Modifier.fillMaxSize(), color = Canvas) {
+        Box(Modifier.fillMaxSize()) {
+            Scaffold(modifier = if (backupAction != null || state.preview != null) Modifier.clearAndSetSemantics { } else Modifier, containerColor = Canvas, topBar = {
+                TopAppBar(title = { Text(destination.title, fontWeight = FontWeight.SemiBold) }, navigationIcon = {
+                    IconButton(onClick = ::back, enabled = !busy) {
+                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back")
+                    }
+                }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Canvas))
+            }) { padding ->
+                Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding), contentAlignment = Alignment.TopCenter) {
+                    key(destination) {
+                        Column(Modifier.widthIn(max = 560.dp).fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(22.dp),
+                            verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                            if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(state.busy.orEmpty(), color = Forest, fontSize = 14.sp) }
+                            state.notice?.let { AccountNotice(it, false, model::clearMessage) }
+                            state.error?.let { AccountNotice(it, true, model::clearMessage) }
+                            when (destination) {
+                                AccountDestination.ACCOUNT -> AccountHome(state, model,
+                                    onLogin = { navigate(AccountDestination.LOGIN) }, onRegister = { navigate(AccountDestination.REGISTER) },
+                                    onGoogle = { activity?.let(model::google) }, googleAvailable = activity != null)
+                                AccountDestination.LOGIN, AccountDestination.REGISTER, AccountDestination.RESET -> AccountForm(destination, state, model,
+                                    email, { email = it }, ::navigate, onGoogle = { activity?.let(model::google) }, googleAvailable = activity != null)
+                                AccountDestination.BACKUP -> BackupHome(::navigate)
+                                AccountDestination.FILES -> FileBackupPage(smsReady, busy, onExport = { backupAction = BackupAction.EXPORT }, onRestore = onPickRestore)
+                                AccountDestination.CLOUD -> CloudBackupPage(state, smsReady,
+                                    onBackup = { backupAction = BackupAction.CLOUD_BACKUP }, onRestore = { backupAction = BackupAction.CLOUD_RESTORE },
+                                    onAccount = { accountReturn = AccountDestination.CLOUD; navigate(if (state.profile.uid == null) AccountDestination.LOGIN else AccountDestination.ACCOUNT) })
+                            }
+                            Spacer(Modifier.height(18.dp))
                         }
-                        Spacer(Modifier.height(18.dp))
                     }
                 }
             }
+            backupAction?.let { action ->
+                BackupPasswordScreen(action == BackupAction.EXPORT || action == BackupAction.CLOUD_BACKUP,
+                    onDismiss = { backupAction = null; model.clearRestore() }, onConfirm = { pass ->
+                        backupAction = null
+                        when (action) {
+                            BackupAction.EXPORT -> model.export(pass)
+                            BackupAction.CLOUD_BACKUP -> model.backupCloud(pass)
+                            BackupAction.FILE_RESTORE -> model.inspectRestore(pass, false)
+                            BackupAction.CLOUD_RESTORE -> model.inspectRestore(pass, true)
+                        }
+                    })
+            }
+            RestoreConfirmation(state, model)
         }
-        backupAction?.let { action ->
-            BackupPasswordDialog(action == BackupAction.EXPORT || action == BackupAction.CLOUD_BACKUP,
-                onDismiss = { backupAction = null; model.clearRestore() }, onConfirm = { pass ->
-                    backupAction = null
-                    when (action) {
-                        BackupAction.EXPORT -> model.export(pass)
-                        BackupAction.CLOUD_BACKUP -> model.backupCloud(pass)
-                        BackupAction.FILE_RESTORE -> model.inspectRestore(pass, false)
-                        BackupAction.CLOUD_RESTORE -> model.inspectRestore(pass, true)
-                    }
-                })
-        }
-        RestoreConfirmation(state, model)
     }
 }
 

@@ -1,6 +1,8 @@
 # Sandesh release preparation
 
-Version: 0.4.0 (code 8), application ID `com.sandesh.app`, minimum API 24, target API 37. Includes recoverable manual Spam, an app-local blocked-sender list and opt-in sender announcements/manual SMS readout through a selected headset on Android 9+. Notification diagnostics, compact SIM icons and separate account/backup pages remain available. Earlier com.gediadeepak.smsapp builds install separately; their private settings do not migrate automatically. Google sign-in requires the correct signing fingerprint registered in Firebase.
+Version: 0.4.1 (code 9), application ID `com.sandesh.app`, minimum API 24, target API 37. Includes recoverable manual Spam, an app-local blocked-sender list and opt-in sender announcements/manual SMS readout through a selected headset on Android 9+. Notification diagnostics, compact SIM icons and separate account/backup pages remain available. Earlier com.gediadeepak.smsapp builds install separately; their private settings do not migrate automatically. Google sign-in requires the correct signing fingerprint registered in Firebase.
+
+Settings now opens from the left drawer as a full-screen page with expandable sections. Account, backup, password entry, restore preview, blocked senders and headset configuration use full-screen pages with Back navigation. Appearance, default SIM and reply-idea toggles save immediately; edited SIM labels have their own Save button. AI integration remains deferred.
 
 ## Build and signing
 

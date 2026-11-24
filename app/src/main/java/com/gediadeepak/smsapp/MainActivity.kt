@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModelProvider
 import com.gediadeepak.smsapp.ui.SandeshApp
@@ -80,9 +81,11 @@ class MainActivity : ComponentActivity() {
             }
             SandeshTheme(state.preferences.theme) {
                 Box(Modifier.fillMaxSize()) {
-                    SandeshApp(model, ::setupSms, ::openAppSettings, ::requestNotifications,
+                    Box(if (accountDestination != null) Modifier.fillMaxSize().clearAndSetSemantics { } else Modifier.fillMaxSize()) {
+                      SandeshApp(model, ::setupSms, ::openAppSettings, ::requestNotifications,
                         onAccount = { accountDestination = AccountDestination.ACCOUNT }, onBackup = { accountDestination = AccountDestination.BACKUP },
                         onTestNotifications = ::testNotifications, onReadMessage = ::readMessage)
+                    }
                     accountDestination?.let { start -> AccountBackupFlow(account, start, state.ready,
                         onPickRestore = { restoreLauncher.launch(arrayOf("*/*")) }, onDismiss = { accountDestination = null }) }
                     if (showSplash) SandeshSplash { showSplash = false }

@@ -1,5 +1,7 @@
 package com.gediadeepak.smsapp.ui
 
+import android.content.Intent
+import android.provider.Settings
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
@@ -20,7 +22,7 @@ import com.gediadeepak.smsapp.audio.HeadsetReadout
 import com.gediadeepak.smsapp.telephony.SmsNotificationStatus
 
 @Composable
-internal fun HeadsetSettingsDialog(notificationStatus: SmsNotificationStatus, onNotifications: () -> Unit, onDismiss: () -> Unit) {
+internal fun HeadsetSettingsScreen(notificationStatus: SmsNotificationStatus, onNotifications: () -> Unit, onDismiss: () -> Unit) {
     val context = LocalContext.current
     var outputs by remember { mutableStateOf(HeadsetReadout.outputs(context)) }
     var chosen by remember { mutableStateOf(HeadsetReadout.selectedKey(context)) }
@@ -37,10 +39,18 @@ internal fun HeadsetSettingsDialog(notificationStatus: SmsNotificationStatus, on
     }
     val connected = outputs.any { it.key == chosen }
     val ready = Build.VERSION.SDK_INT >= 28 && connected && notificationStatus == SmsNotificationStatus.ENABLED
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Headset readout") }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    SettingsPage("Headset readout", onDismiss) {
+        Column(Modifier.widthIn(max = 680.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Announce the sender when new SMS arrives. Message text is spoken only when you choose Read message in a notification or tap its speaker button.", fontSize = 14.sp, lineHeight = 23.sp)
             if (Build.VERSION.SDK_INT < 28) Text("This feature requires Android 9 or newer.", color = Muted)
+            OutlinedButton(onClick = {
+                try { context.startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
+                catch (_: Exception) {
+                    try { context.startActivity(Intent(Settings.ACTION_SETTINGS)) }
+                    catch (_: Exception) { error = "Open Android Settings and search for Text-to-speech." }
+                }
+            }, modifier = Modifier.fillMaxWidth()) { Text("Speech voice settings") }
+            Text("Choose your preferred speech engine and download an offline voice for your phone’s language or English. Then return here and test your headset.", color = Muted, fontSize = 12.sp, lineHeight = 21.sp)
             Text("Choose your headphones", style = MaterialTheme.typography.titleSmall)
             Text("Select a private audio device, not a Bluetooth speaker or car stereo. Playback stops when the selected route is lost or changes.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)
             if (outputs.isEmpty()) Text("Connect wired, USB or Bluetooth headphones, then choose them here.", color = Muted, fontSize = 13.sp)
@@ -60,5 +70,5 @@ internal fun HeadsetSettingsDialog(notificationStatus: SmsNotificationStatus, on
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) }
             Text("Uses an installed offline speech voice. Spam and blocked messages are never announced. Very long messages are shortened with a spoken notice. Some unidentified audio devices must be selected again after the app process restarts.", color = Muted, fontSize = 12.sp, lineHeight = 21.sp)
         }
-    }, confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } })
+    }
 }

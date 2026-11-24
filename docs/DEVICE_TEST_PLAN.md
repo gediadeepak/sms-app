@@ -78,3 +78,14 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 - Use Test headset and Stop before testing private content. Verify an installed offline voice is required. Test missing voice, focus denial, calls, DND, screen lock, background restrictions and force-stop recovery without crashes or repeated old announcements.
 - During speech disconnect the selected output, connect a speaker/car, switch routes, interrupt audio focus and press Stop. Audio must stop without exposing message content through another output. On Android 16+ verify all reported routes match the chosen device. Test process death/temporary file cleanup and unidentified output reselection.
 - Repeat the release-gating checklist in SPAM_AND_HEADSET.md before publication; no physical audio-routing results are claimed by build/unit tests.
+
+## Settings navigation (0.4.1)
+
+- Open Settings from the left drawer on a phone and the persistent sidebar on a wide display. Confirm a full page replaces the inbox, and Back returns to the previous conversation/folder.
+- Expand each section; only one is expanded at a time. Check all three themes at large font size, with keyboard and after rotation.
+- Change theme, default SIM and reply ideas; close/reopen and restart to confirm persistence. Save SIM labels; whitespace-only labels must not save.
+- Open Account, login, register, reset, Backup, File and Cloud pages; toolbar/system Back returns through the expected pages to Settings. Revisit after rotation.
+- Open backup password and restore preview pages; Back cancels without changing SMS. Do not retain passwords through rotation/process recreation. Verify normal encrypted export/restore still works.
+- Open Blocked senders and Headset readout. Back returns to the same expanded Settings section and scroll position. Unblock confirmation is also a page; Cancel returns without changing the block list.
+- While Settings/account/backup is visible, receive an SMS in the previously selected conversation: it must stay unread and notify normally.
+- In Headset readout, open Speech voice settings. Verify Android TTS settings opens (or Android Settings as a fallback), then return to the same page and test an installed offline voice.

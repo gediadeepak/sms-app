@@ -105,33 +105,41 @@ private fun BackupLimits() {
 internal fun RestoreConfirmation(state: AccountState, model: AccountViewModel) {
     val busy = state.busy != null
     state.preview?.let { preview ->
-        AlertDialog(onDismissRequest = { if (!busy) model.clearRestore() }, title = { Text("Restore this backup?") },
-            text = { Text("${preview.messageCount} SMS messages\nCreated ${DateFormat.getDateTimeInstance().format(Date(preview.createdAt))}\n\nExisting messages will be kept, duplicates skipped, and saved messages will not be sent. Saved spam flags and blocked senders will also be restored. The default sending SIM will return to Ask every time.") },
-            confirmButton = { Button(onClick = model::confirmRestore, enabled = !busy) { Text(if (busy) "Restoring…" else "Restore messages") } },
-            dismissButton = { TextButton(onClick = model::clearRestore, enabled = !busy) { Text("Cancel") } })
+        SettingsPage("Restore this backup?", { if (!busy) model.clearRestore() }) {
+            Column(Modifier.widthIn(max = 560.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                Text("${preview.messageCount} SMS messages")
+                Text("Created ${DateFormat.getDateTimeInstance().format(Date(preview.createdAt))}")
+                Text("Existing messages will be kept, duplicates skipped, and saved messages will not be sent. Saved spam flags and blocked senders will also be restored. The default sending SIM will return to Ask every time.")
+                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                Button(onClick = model::confirmRestore, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "Restoring…" else "Restore messages") }
+                TextButton(onClick = model::clearRestore, enabled = !busy) { Text("Cancel") }
+            }
+        }
     }
 }
 
 @Composable
-internal fun BackupPasswordDialog(creating: Boolean, onDismiss: () -> Unit, onConfirm: (CharArray) -> Unit) {
+internal fun BackupPasswordScreen(creating: Boolean, onDismiss: () -> Unit, onConfirm: (CharArray) -> Unit) {
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(if (creating) "Protect your backup." else "Unlock your backup.") }, text = {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    SettingsPage(if (creating) "Protect your backup" else "Unlock your backup", onDismiss) {
+        Column(Modifier.widthIn(max = 560.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(if (creating) "Choose a backup password of at least 12 characters. Keep it safe: your account password reset cannot recover this backup." else "Enter the password used when this backup was created. Your inbox will not change until verification and confirmation are complete.", fontSize = 14.sp, lineHeight = 23.sp)
             OutlinedTextField(password, { password = it; error = null }, label = { Text("Backup password") }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
             if (creating) OutlinedTextField(confirm, { confirm = it; error = null }, label = { Text("Confirm backup password") }, singleLine = true,
                 visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+            Button(onClick = {
+                when {
+                    creating && password.length < 12 -> error = "Use at least 12 characters."
+                    creating && password != confirm -> error = "The backup passwords do not match."
+                    password.isEmpty() -> error = "Enter the backup password."
+                    else -> { val chars = password.toCharArray(); password = ""; confirm = ""; onConfirm(chars) }
+                }
+            }, modifier = Modifier.fillMaxWidth()) { Text(if (creating) "Create backup" else "Verify backup") }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-    }, confirmButton = { Button(onClick = {
-        when {
-            creating && password.length < 12 -> error = "Use at least 12 characters."
-            creating && password != confirm -> error = "The backup passwords do not match."
-            password.isEmpty() -> error = "Enter the backup password."
-            else -> { val chars = password.toCharArray(); password = ""; confirm = ""; onConfirm(chars) }
-        }
-    }) { Text(if (creating) "Create backup" else "Verify backup") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
+    }
 }

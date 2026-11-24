@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +57,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
     val scope = rememberCoroutineScope()
     var newMessage by rememberSaveable { mutableStateOf(false) }
     var settings by rememberSaveable { mutableStateOf(false) }
+    val settingsStateHolder = rememberSaveableStateHolder()
     var assistant by rememberSaveable { mutableStateOf(false) }
     var blockedSenders by rememberSaveable { mutableStateOf(false) }
     var headsetSettings by rememberSaveable { mutableStateOf(false) }
@@ -69,7 +71,21 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
         SmsSetup(state, onSetup, onAppSettings, model::savePreferences, onAccount, onBackup)
         return
     }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    if (settings) {
+        when {
+            blockedSenders -> BlockedSendersScreen(state.blockedSenders, model::unblockSender) { blockedSenders = false }
+            headsetSettings -> HeadsetSettingsScreen(state.notificationStatus, onNotifications) { headsetSettings = false }
+            else -> settingsStateHolder.SaveableStateProvider("settings") {
+                SettingsScreen(state, onSave = model::savePreferences, onNotifications = onNotifications,
+                    onTestNotifications = onTestNotifications, onAppSettings = onAppSettings,
+                    onAccount = onAccount, onBackup = onBackup, onBlockedSenders = { blockedSenders = true },
+                    onHeadset = { headsetSettings = true }, onDismiss = { settings = false })
+            }
+        }
+        return
+    }
+    settingsStateHolder.SaveableStateProvider("workspace") {
+      BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 840.dp
         val desktop = maxWidth >= 1250.dp
         LaunchedEffect(wide) { if (wide && state.selected == null) state.visible.firstOrNull()?.let { model.select(it.id) } }
@@ -97,7 +113,6 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
                             if (!desktop) IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(Icons.Outlined.Menu, "Open navigation") }
                         }, actions = {
                             IconButton(onClick = model::refresh) { Icon(Icons.Outlined.Refresh, "Refresh inbox", tint = Muted) }
-                            IconButton(onClick = openSettings) { Icon(Icons.Outlined.Settings, "Settings", tint = Muted) }
                         }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Canvas))
                     }
                 },
@@ -131,12 +146,8 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
             ModalNavigationDrawer(drawerState = drawer, drawerContent = { ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow) { navigation() } }) { workspace() }
         }
     }
+    }
     if (newMessage) NewConversationDialog(state, { name, number, id -> model.newConversation(name, number, id) }) { newMessage = false }
-    if (settings) SettingsDialog(state, onSave = { model.savePreferences(it); settings = false }, onNotifications = onNotifications, onTestNotifications = onTestNotifications, onAppSettings = onAppSettings,
-        onAccount = { settings = false; onAccount() }, onBackup = { settings = false; onBackup() }, onBlockedSenders = { settings = false; blockedSenders = true },
-        onHeadset = { settings = false; headsetSettings = true }, onDismiss = { settings = false })
-    if (blockedSenders) BlockedSendersDialog(state.blockedSenders, model::unblockSender) { blockedSenders = false }
-    if (headsetSettings) HeadsetSettingsDialog(state.notificationStatus, onNotifications) { headsetSettings = false }
     if (spamAction != null && state.selected != null) {
         val action = spamAction!!
         val restoring = action == "restore"

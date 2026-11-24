@@ -12,8 +12,8 @@ android {
         applicationId = "com.sandesh.app"
         minSdk = 24
         targetSdk = 37
-        versionCode = 8
-        versionName = "0.4.0"
+        versionCode = 9
+        versionName = "0.4.1"
     }
     buildFeatures { compose = true }
     compileOptions {

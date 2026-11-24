@@ -23,12 +23,14 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 
 ## What is implemented
 
+- Full-screen **Settings** from the left navigation drawer, with expandable sections for account/backup, appearance, SIM cards, reply ideas, notifications, spam, headset readout and app information. Account, backup, blocked senders and headset options use pages with Back navigation.
+
 - Android default-SMS role onboarding, followed by SMS/SIM permission requests.
 - Real SMS inbox from Android's system SMS provider, including unread state and per-message subscription IDs.
-- Actual active SIM/eSIM detection. **Settings → Default sending SIM** supports a specific active SIM or **Ask every time**. The composer always shows the selected line. With multiple SIMs and no default, choose before every send. A removed saved SIM never silently falls back to another line.
+- Actual active SIM/eSIM detection. **Settings → SIM cards → Default sending SIM** supports a specific active SIM or **Ask every time**. The composer always shows the selected line. With multiple SIMs and no default, choose before every send. A removed saved SIM never silently falls back to another line.
 - Real subscription-specific multipart SMS submission, persistent per-part result tracking, incoming SMS persistence and notifications. “Delivered” requires carrier delivery reports; it is never simulated. No automatic retries.
 - Notification permission is requested once after SMS setup on Android 13+. If blocked, an inbox warning and Settings show whether permission, app notifications or the Messages channel need enabling. Settings includes a local test alert. Obscured/background conversations are not automatically marked read.
-- Recoverable **Spam** folder, manual **Move to Spam**, sender blocking and **Settings → Blocked senders**. Blocked/spam SMS remains in Android's store and is silent inside Sandesh. Restore/unblock brings conversations back; calls and other apps are unaffected. No automatic AI spam classifier is included.
+- Recoverable **Spam** folder, manual **Move to Spam**, sender blocking and **Settings → Spam & blocked senders → Blocked senders**. Blocked/spam SMS remains in Android's store and is silent inside Sandesh. Restore/unblock brings conversations back; calls and other apps are unaffected. No automatic AI spam classifier is included.
 - Optional **Settings → Headset readout** on Android 9+: choose an audio device, enable sender-only announcements, then use **Read message** in a notification or the message's speaker button for its body. Uses an installed offline TTS voice, a Stop control and route/disconnection checks. Headset settings are device-specific and excluded from backups. See [spam and headset guide](docs/SPAM_AND_HEADSET.md).
 - SQLite app database for starred/archived flags, aliases, send-part receipts and pending incoming SMS. Actual SMS remains in Android's system store.
 - Three saved themes: **Blue & white** (default), **Green & white**, and **Black & white**.
