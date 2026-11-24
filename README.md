@@ -11,7 +11,7 @@ $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
 .\gradlew.bat :app:assembleDebug :app:assembleRelease :app:bundleRelease :core:test :app:lintDebug :app:lintRelease
 ```
 
-Pinned toolchain: Gradle 9.6.0, AGP 9.5.1, Kotlin 2.4.21, Compose BOM 2025.08.01, Android SDK 37 and Build Tools 36.0.0. The SDK path belongs in ignored `local.properties`; Android Studio creates this per machine. The installed Android Studio JDK can run the build.
+Pinned toolchain: Gradle 9.6.0, AGP 9.5.2, Kotlin 2.4.21, Compose BOM 2025.08.01, Android SDK 37 and Build Tools 36.0.0. The SDK path belongs in ignored `local.properties`; Android Studio creates this per machine. The installed Android Studio JDK can run the build.
 
 Outputs:
 

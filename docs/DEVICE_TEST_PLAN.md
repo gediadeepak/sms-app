@@ -33,6 +33,7 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 
 ## UI, themes and branding
 
+- Inbox rows show a compact SIM icon plus 1/2 immediately before the latest-message date, with no carrier-label row. Unknown subscriptions show a question mark and TalkBack announces Unknown SIM. Verify mixed-SIM threads use the latest message's line, unread counts/stars stay visible, and more rows fit on the phone with the decorative footers removed.
 - Blue/white is the default. Switch to green/white and black/white; inspect inbox, bubbles, dialogs, assistant, system bars and composer, then restart to verify persistence.
 - Splash and launcher preserve both the winged envelope and supporting hand. Splash tint follows the saved theme.
 - Disable system animations: splash should complete immediately. Rotate or recreate the activity: it should not repeat the splash unnecessarily.

@@ -26,6 +26,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,7 +91,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
                     }
                 },
                 bottomBar = {
-                    Row(Modifier.fillMaxWidth().background(Canvas).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    if (wide) Row(Modifier.fillMaxWidth().background(Canvas).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("Made for two lines.", fontSize = 11.sp, color = Muted)
                         Text(if (state.loading) "Updating inbox…" else "SMS · on your device", fontSize = 11.sp, color = Muted)
                     }
@@ -99,7 +101,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))) {
                     if (wide || state.selectedId == null) {
                         Inbox(state, Modifier.then(if (wide) Modifier.width(330.dp) else Modifier.weight(1f)), model::select,
-                            model::search, model::filter, startMessage)
+                            model::search, model::filter, startMessage, compact = !wide)
                     }
                     if (wide) VerticalDivider()
                     if (wide || state.selectedId != null) {
@@ -171,10 +173,13 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
 }
 
 @Composable
-private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> Unit, onSearch: (String) -> Unit, onFilter: (SimLine?) -> Unit, onNew: () -> Unit) {
+private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> Unit, onSearch: (String) -> Unit, onFilter: (SimLine?) -> Unit, onNew: () -> Unit, compact: Boolean = true) {
     Column(modifier.fillMaxHeight()) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text(if (state.folder == Folder.INBOX) "All messages" else "${state.folder.label} messages", fontSize = 20.sp, fontWeight = FontWeight.SemiBold); Text("Two lines. One happy inbox.", fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 5.dp)) }
+            Column(Modifier.weight(1f)) {
+                Text(if (state.folder == Folder.INBOX) "All messages" else "${state.folder.label} messages", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+                if (!compact) Text("Two lines. One happy inbox.", fontSize = 12.sp, color = Muted, modifier = Modifier.padding(top = 5.dp))
+            }
             IconButton(onClick = onNew) { Icon(Icons.Outlined.Edit, "New conversation", tint = Muted, modifier = Modifier.size(20.dp)) }
         }
         OutlinedTextField(value = state.query, onValueChange = onSearch, placeholder = { Text("Search conversations", fontSize = 14.sp) },
@@ -185,25 +190,37 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
             LineFilter("All lines", state.filterLine == null) { onFilter(null) }
             state.subscriptions.map { it.line }.distinct().forEach { line -> LineFilter(state.preferences.label(line), state.filterLine == line, line) { onFilter(line) } }
         }
-        Row(Modifier.padding(horizontal = 22.dp, vertical = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("CONVERSATIONS", color = Muted, fontSize = 10.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f)); Text(state.visible.size.toString().padStart(2, '0'), color = Muted, fontSize = 11.sp) }
+        Row(Modifier.padding(horizontal = 22.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("CONVERSATIONS", color = Muted, fontSize = 10.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f)); Text(state.visible.size.toString().padStart(2, '0'), color = Muted, fontSize = 11.sp) }
+        if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (state.pendingMms > 0) Text("MMS received: attachments are unavailable. See Settings.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
         if (state.visible.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(if (state.query.isNotBlank()) "No matching conversations." else "A little space for new conversations.", Modifier.padding(24.dp), color = Muted, fontSize = 14.sp) }
         else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 9.dp)) {
             items(state.visible, key = { it.id }) { c ->
-                Row(Modifier.fillMaxWidth().padding(bottom = 4.dp).background(if (c.id == state.selectedId) Sage else Color.Transparent, RoundedCornerShape(10.dp))
-                    .clickable { onSelect(c.id) }.padding(horizontal = 12.dp, vertical = 17.dp), verticalAlignment = Alignment.Top) {
+                val last = c.messages.lastOrNull()
+                Row(Modifier.fillMaxWidth().background(if (c.id == state.selectedId) Sage else Color.Transparent, RoundedCornerShape(10.dp))
+                    .clickable { onSelect(c.id) }.padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.Top) {
                     Avatar(c.initials, c.name); Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) { Text(c.name, fontSize = 15.sp, fontWeight = if (c.unread > 0) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis); Text(c.messages.lastOrNull()?.let { listTime(it.timestamp) } ?: "New", fontSize = 10.sp, color = Muted) }
-                        val last = c.messages.lastOrNull()
-                        Text((if (last?.outgoing == true) "You: " else "") + (last?.text ?: "Say hello. Start a conversation."), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp, color = Muted, modifier = Modifier.padding(vertical = 7.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) { LineBadge(c.line, state.preferences); Spacer(Modifier.weight(1f)); if (c.unread > 0) Badge(containerColor = Forest) { Text(c.unread.toString()) } else if (c.starred) Icon(Icons.Outlined.Star, "Starred", Modifier.size(13.dp), tint = Work) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(c.name, fontSize = 15.sp, fontWeight = if (c.unread > 0) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(Modifier.width(8.dp))
+                            CompactSimIcon(last?.line ?: c.line, state.preferences)
+                            Spacer(Modifier.width(5.dp))
+                            Text(last?.let { listTime(it.timestamp) } ?: "New", fontSize = 10.sp, color = Muted)
+                        }
+                        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text((if (last?.outgoing == true) "You: " else "") + (last?.text ?: "Say hello. Start a conversation."), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 13.sp, color = Muted, modifier = Modifier.weight(1f))
+                            if (c.unread > 0) { Spacer(Modifier.width(8.dp)); Badge(containerColor = Forest) { Text(c.unread.toString()) } }
+                            else if (c.starred) { Spacer(Modifier.width(8.dp)); Icon(Icons.Outlined.Star, "Starred", Modifier.size(13.dp), tint = Work) }
+                        }
                     }
                 }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Text("A little space for every conversation.", Modifier.fillMaxWidth().padding(15.dp), fontSize = 11.sp, color = Muted)
+        if (!compact) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text("A little space for every conversation.", Modifier.fillMaxWidth().padding(15.dp), fontSize = 11.sp, color = Muted)
+        }
     }
 }
 
@@ -363,6 +380,15 @@ private fun Avatar(initials: String, name: String, small: Boolean = false) {
     val index = when (name) { "Maya Patel" -> 0; "Alex Morgan" -> 1; "Mum" -> 2; "Studio North" -> 3; else -> (name.hashCode().toLong().let { if (it < 0) -it else it } % palettes.size).toInt() }
     val colors = if (MaterialTheme.colorScheme.background == Color.Black) Color(0xFF303030) to Color.White else palettes[index]
     Box(Modifier.size(if (small) 36.dp else 42.dp).background(colors.first, CircleShape), contentAlignment = Alignment.Center) { Text(initials.take(2), color = colors.second, fontSize = 12.sp, fontWeight = FontWeight.Medium) }
+}
+
+@Composable
+private fun CompactSimIcon(line: SimLine, preferences: Preferences) {
+    val description = if (line == SimLine.UNKNOWN) "Unknown SIM" else "SIM ${line.slot}, ${preferences.label(line)}"
+    Row(Modifier.clearAndSetSemantics { contentDescription = description }, verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Outlined.SimCard, null, Modifier.size(12.dp), tint = lineColor(line))
+        Text(if (line == SimLine.UNKNOWN) "?" else line.slot.toString(), fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = lineColor(line))
+    }
 }
 
 @Composable
