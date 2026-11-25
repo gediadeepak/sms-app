@@ -21,6 +21,7 @@ data class AccountState(
     val restorePasswordRequested: Boolean = false, val preview: BackupPreview? = null,
     val inboxChanged: Int = 0, val verificationSentAt: Long = 0,
     val restoring: Boolean = false,
+    val cloudSources: List<CloudBackupSource> = emptyList(),
 )
 
 class AccountViewModel(application: Application) : AndroidViewModel(application) {
@@ -29,10 +30,18 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
     private val cloud = FirebaseBackupStore(accounts)
     private val mutableState = MutableStateFlow(AccountState())
     val state = mutableState.asStateFlow()
-    private val stopObserving = accounts.observe { profile -> mutableState.update { it.copy(profile = profile) } }
+    private val stopObserving = accounts.observe { profile -> mutableState.update { it.copy(profile = profile,cloudSources=if(it.profile.uid==profile.uid) it.cloudSources else emptyList()) } }
     private var pendingExport: ByteArray? = null
     private var pendingRestore: ByteArray? = null
     private var restoreFile: Uri? = null
+    private var cloudSource = "latest"
+    fun cloudSources() = run("Loading cloud backup sources…") {
+        val uid=accounts.profile().uid
+        val sources=cloud.sources()
+        check(accounts.profile().uid==uid) { "Account changed. Reload backup sources." }
+        mutableState.update {it.copy(cloudSources=sources,notice=if(sources.isEmpty()) "No completed cloud backups exist for this account." else null)}
+    }
+    fun chooseCloudSource(source:String) { require(FirebaseBackupStore.validSource(source));cloudSource=source }
 
     private fun run(label: String, timeout: Boolean = true, action: suspend () -> Unit) {
         if (state.value.busy != null) return
@@ -63,7 +72,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         accounts.verifyEmail(); mutableState.update { it.copy(notice = "Verification email sent.", verificationSentAt = System.currentTimeMillis()) }
     }
     fun refreshAccount() = run("Refreshing your account…") { accounts.refresh() }
-    fun signOut() = run("Signing out…") { clearRestore(); accounts.signOut() }
+    fun signOut() = run("Signing out…") { val auto=AutomaticBackups(getApplication());if(auto.prefs.getString("mode",null)=="cloud") auto.disable(); clearRestore(); accounts.signOut() }
 
     private suspend fun encryptedSnapshot(password: CharArray): ByteArray = withContext(Dispatchers.Default) {
         val plain = withContext(Dispatchers.IO) { backups.snapshot() }
@@ -84,7 +93,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         if (uri == null) { pendingExport?.fill(0); pendingExport = null; return }
         run("Saving encrypted backup…") {
             val bytes = pendingExport ?: error("Backup export was interrupted. Please create it again.")
-            try { withContext(Dispatchers.IO) { backups.writeEncrypted(uri, bytes) }; mutableState.update { it.copy(notice = "Encrypted backup saved. Keep its password somewhere safe; it cannot be reset.") } }
+            try { withContext(Dispatchers.IO) { backups.writeEncrypted(uri, bytes); AutomaticBackups.completed(getApplication(),"file") }; mutableState.update { it.copy(notice = "Encrypted backup saved. Keep its password somewhere safe; it cannot be reset.") } }
             finally { bytes.fill(0); pendingExport = null }
         }
     }
@@ -95,6 +104,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
                 val bytes = encryptedSnapshot(password)
                 try {
                     val cleaned = cloud.upload(bytes)
+                    AutomaticBackups.completed(getApplication(),"cloud")
                     mutableState.update { it.copy(notice = if (cleaned) "Encrypted cloud backup saved to your account." else "Cloud backup saved. The older encrypted snapshot could not be cleaned up.") }
                 } finally { bytes.fill(0) }
             } finally { password.fill('\u0000') }
@@ -110,7 +120,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
         if (state.value.busy != null) { password.fill('\u0000'); return }
         run("Verifying encrypted backup…") {
             try {
-                val encoded = if (fromCloud) cloud.downloadLatest() else withContext(Dispatchers.IO) { backups.readEncrypted(restoreFile ?: error("Choose a backup file first.")) }
+                val encoded = if (fromCloud) cloud.downloadLatest(cloudSource) else withContext(Dispatchers.IO) { backups.readEncrypted(restoreFile ?: error("Choose a backup file first.")) }
                 val plain = try { withContext(Dispatchers.Default) { BackupCipher.decrypt(encoded, password) } } finally { encoded.fill(0) }
                 try {
                     val preview = withContext(Dispatchers.Default) { backups.validate(plain) }
@@ -143,7 +153,7 @@ class AccountViewModel(application: Application) : AndroidViewModel(application)
             "ERROR_TOO_MANY_REQUESTS" -> "Too many attempts. Please wait and try again."
             else -> "Account service could not complete the request. Check your connection and try again."
         }
-        is FirebaseFirestoreException -> if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) "Cloud backup access was denied. Verify your email, refresh your account and try again." else "Cloud backup could not complete. Check your connection and try again."
+        is FirebaseFirestoreException -> if (error.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) "Cloud backup access was denied after verification. Refresh your account and check that the Sandesh Firestore rules allow this verified account. File backup still works without Firebase." else "Cloud backup could not complete. Check your connection and try again."
         is IllegalArgumentException, is IllegalStateException -> error.message ?: "The operation could not be completed."
         else -> "The operation could not be completed. Check your connection or selected backup file and try again."
     }

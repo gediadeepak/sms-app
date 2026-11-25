@@ -53,7 +53,7 @@ class SmsPagingRepository(private val context: Context, private val contacts: Co
         return Conversation(thread, meta?.alias?.takeIf { it.isNotBlank() } ?: number, number, last.line,
             listOf(last), unread(thread, signal), meta?.starred == true, meta?.archived == true,
             subscriptionId = last.subscriptionId, spam = meta?.spam == true, blocked = db.isSenderBlocked(number),
-            contactName = contacts.name(number), historyReady = false, hasOlderMessages = true)
+            pinned = meta?.pinned == true, vendor = meta?.vendor.orEmpty(), contactName = contacts.name(number), historyReady = false, hasOlderMessages = true)
     }
 
     fun inbox(sims: List<DeviceSim>, folder: Folder, line: SimLine?, search: String, after: SmsPageKey?, limit: Int, signal: CancellationSignal): SmsPage<Conversation> {
@@ -95,7 +95,7 @@ class SmsPagingRepository(private val context: Context, private val contacts: Co
                 if (line != null && sims.find { it.subscriptionId == sub }?.line != line) continue
                 val name = contacts.name(number)
                 if (needle.isNotEmpty() && thread !in textMatches && !number.contains(needle, true) &&
-                    flags?.alias?.contains(needle, true) != true && name?.contains(needle, true) != true) continue
+                    flags?.alias?.contains(needle, true) != true && flags?.vendor?.contains(needle,true) != true && BusinessGroups.suggestion(number)?.contains(needle,true) != true && name?.contains(needle, true) != true) continue
                 val item = conversation(c, sims, signal).copy(contactName = name)
                 if (folder == Folder.UNREAD && item.unread == 0) continue
                 if (result.size == limit) return SmsPage(result, SmsPaging.key(result.last().messages.last()))

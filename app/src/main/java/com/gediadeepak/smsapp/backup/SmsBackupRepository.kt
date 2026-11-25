@@ -45,14 +45,14 @@ class SmsBackupRepository(private val context: Context) {
         } ?: error("Could not read the SMS inbox.")
         val metadata = JSONArray()
         database.metadata().forEach { (id, flags) -> addresses[id]?.let { address -> metadata.put(JSONObject()
-            .put("address", address).put("starred", flags.starred).put("archived", flags.archived).put("alias", flags.alias).put("spam", flags.spam)) } }
+            .put("address", address).put("starred", flags.starred).put("archived", flags.archived).put("alias", flags.alias).put("spam", flags.spam).put("pinned",flags.pinned).put("vendor",flags.vendor)) } }
         val p = preferences.load()
         val blockedSenders = database.blockedSenders().values.toList()
         require(blockedSenders.size <= 10_000) { "This backup exceeds the 10,000 blocked-sender limit." }
         val root = JSONObject().put("format", FORMAT).put("version", 1).put("createdAt", System.currentTimeMillis())
             .put("messageCount", messages.length()).put("messages", messages).put("threads", metadata)
             .put("blockedSenders", JSONArray(blockedSenders))
-            .put("preferences", JSONObject().put("personal", p.personalLabel).put("work", p.workLabel).put("theme", p.theme.name).put("suggestions", p.suggestions))
+            .put("preferences", JSONObject().put("personal", p.personalLabel).put("work", p.workLabel).put("theme", p.theme.name).put("suggestions", p.suggestions).put("undoSend",p.undoSend).put("groupBusinesses",p.groupBusinesses))
         return root.toString().toByteArray(Charsets.UTF_8).also { require(it.size <= BackupCipher.MAX_PLAIN_BYTES) { "This backup exceeds the 16 MiB limit." } }
     }
 
@@ -104,12 +104,13 @@ class SmsBackupRepository(private val context: Context) {
                 val threadId = thread(m.getString("address"))
                 database.updateMetadata(threadId.toString()) { existing -> existing.copy(
                     starred = existing.starred || m.getBoolean("starred"), archived = if (threadId in existingThreads) existing.archived else m.getBoolean("archived"),
-                    alias = existing.alias.ifBlank { m.getString("alias") }, spam = existing.spam || m.optBoolean("spam", false)) }
+                    alias = existing.alias.ifBlank { m.getString("alias") }, spam = existing.spam || m.optBoolean("spam", false), pinned = existing.pinned || m.optBoolean("pinned",false), vendor = existing.vendor.ifBlank { m.optString("vendor","").take(40) }) }
             }
             root.optJSONArray("blockedSenders")?.let { senders -> repeat(senders.length()) { database.setSenderBlocked(senders.getString(it), true) } }
             val p = root.getJSONObject("preferences")
             preferences.save(preferences.load().copy(personalLabel = p.getString("personal"), workLabel = p.getString("work"),
-                theme = ThemeMode.valueOf(p.getString("theme")), suggestions = p.getBoolean("suggestions"), defaultSubscriptionId = null, aiEnabled = false))
+                theme = ThemeMode.valueOf(p.getString("theme")), suggestions = p.getBoolean("suggestions"), defaultSubscriptionId = null, aiEnabled = false,
+                undoSend = p.optBoolean("undoSend",true), groupBusinesses = p.optBoolean("groupBusinesses",false)))
         } catch (e: Exception) {
             throw IllegalStateException("Restore stopped after $inserted new messages ($skipped already present). Existing messages were kept. You can retry this backup without duplicating restored messages.", e)
         }
@@ -152,6 +153,8 @@ class SmsBackupRepository(private val context: Context) {
             require(item.getString("address").length in 1..512 && item.getString("alias").length <= 60) { "Invalid conversation metadata." }
             item.getBoolean("starred"); item.getBoolean("archived")
             if (item.has("spam")) item.getBoolean("spam")
+            if (item.has("pinned")) item.getBoolean("pinned")
+            if (item.has("vendor")) require(item.getString("vendor").length <= 40) { "Invalid business group." }
         }
         if (root.has("blockedSenders")) {
             val senders = root.getJSONArray("blockedSenders")

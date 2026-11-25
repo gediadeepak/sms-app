@@ -29,7 +29,7 @@ import com.gediadeepak.smsapp.account.AccountViewModel
 /** Each destination displays one focused page; cloud sign-in returns to its originating page. */
 enum class AccountDestination(val title: String) {
     ACCOUNT("Account"), LOGIN("Log in"), REGISTER("Create account"), RESET("Reset password"),
-    BACKUP("Backup & restore"), FILES("File backup & restore"), CLOUD("Cloud backup & restore")
+    BACKUP("Backup & restore"), FILES("File backup & restore"), CLOUD("Cloud backup & restore"), AUTOMATIC("Automatic backups"), CLOUD_SOURCES("Choose cloud backup")
 }
 
 @Composable
@@ -49,7 +49,8 @@ fun AccountBackupFlow(model: AccountViewModel, startDestination: AccountDestinat
         when (destination) {
             AccountDestination.REGISTER, AccountDestination.RESET -> navigate(AccountDestination.LOGIN)
             AccountDestination.LOGIN -> navigate(accountReturn ?: AccountDestination.ACCOUNT)
-            AccountDestination.FILES, AccountDestination.CLOUD -> navigate(AccountDestination.BACKUP)
+            AccountDestination.CLOUD_SOURCES -> navigate(AccountDestination.CLOUD)
+            AccountDestination.FILES, AccountDestination.CLOUD, AccountDestination.AUTOMATIC -> navigate(AccountDestination.BACKUP)
             AccountDestination.ACCOUNT -> if (accountReturn != null) navigate(accountReturn!!) else onDismiss()
             AccountDestination.BACKUP -> onDismiss()
         }
@@ -89,12 +90,23 @@ fun AccountBackupFlow(model: AccountViewModel, startDestination: AccountDestinat
                                     onGoogle = { activity?.let(model::google) }, googleAvailable = activity != null)
                                 AccountDestination.LOGIN, AccountDestination.REGISTER, AccountDestination.RESET -> AccountForm(destination, state, model,
                                     email, { email = it }, ::navigate, onGoogle = { activity?.let(model::google) }, googleAvailable = activity != null)
+                                AccountDestination.CLOUD_SOURCES -> {
+                                    Text("Choose the manual backup or the phone whose automatic copy you want to restore.")
+                                    OutlinedButton(onClick=model::cloudSources,enabled=!busy){Text("Refresh backup sources")}
+                                    state.cloudSources.forEach {source ->
+                                        OutlinedButton(enabled=!busy,onClick={model.chooseCloudSource(source.id);backupAction=BackupAction.CLOUD_RESTORE},modifier=Modifier.fillMaxWidth()) {
+                                            Column {Text(source.label);if(source.updatedAt>0)Text(java.text.DateFormat.getDateTimeInstance().format(java.util.Date(source.updatedAt)),style=MaterialTheme.typography.bodySmall)}
+                                        }
+                                    }
+                                }
+                                AccountDestination.AUTOMATIC -> AutomaticBackupPage()
                                 AccountDestination.BACKUP -> BackupHome(::navigate)
                                 AccountDestination.FILES -> FileBackupPage(smsReady, busy, onExport = { backupAction = BackupAction.EXPORT }, onRestore = onPickRestore)
                                 AccountDestination.CLOUD -> CloudBackupPage(state, smsReady,
-                                    onBackup = { backupAction = BackupAction.CLOUD_BACKUP }, onRestore = { backupAction = BackupAction.CLOUD_RESTORE },
+                                    onBackup = { backupAction = BackupAction.CLOUD_BACKUP }, onRestore = { model.cloudSources(); navigate(AccountDestination.CLOUD_SOURCES) },
                                     onAccount = { accountReturn = AccountDestination.CLOUD; navigate(if (state.profile.uid == null) AccountDestination.LOGIN else AccountDestination.ACCOUNT) })
                             }
+                            if(destination==AccountDestination.CLOUD) FirebaseVerificationPanel()
                             Spacer(Modifier.height(18.dp))
                         }
                     }

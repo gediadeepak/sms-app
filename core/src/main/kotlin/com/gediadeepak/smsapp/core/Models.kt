@@ -36,6 +36,8 @@ data class Conversation(
     val contactName: String? = null,
     val historyReady: Boolean = true,
     val hasOlderMessages: Boolean = false,
+    val pinned: Boolean = false,
+    val vendor: String = "",
 ) {
     val displayName get() = contactName ?: name
     val initials: String get() = displayName.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()
@@ -50,6 +52,8 @@ data class Preferences(
     val aiEnabled: Boolean = false,
     val aiSummaries: Boolean = true,
     val aiReplies: Boolean = true,
+    val undoSend: Boolean = true,
+    val groupBusinesses: Boolean = false,
 ) {
     fun label(line: SimLine): String = when (line) { SimLine.PERSONAL -> personalLabel; SimLine.WORK -> workLabel; SimLine.UNKNOWN -> "Unknown SIM" }
 }
@@ -80,8 +84,8 @@ fun filterConversations(items: List<Conversation>, folder: Folder, line: SimLine
             Folder.SPAM -> false
         }
         folderMatch && (line == null || c.line == line) &&
-            (search.isEmpty() || c.displayName.contains(search, true) || c.name.contains(search, true) || c.number.contains(search, true) || c.messages.any { it.text.contains(search, true) })
-    }.sortedByDescending { it.messages.lastOrNull()?.timestamp ?: Long.MAX_VALUE }
+            (search.isEmpty() || c.displayName.contains(search, true) || c.name.contains(search, true) || c.number.contains(search, true) || c.vendor.contains(search,true) || BusinessGroups.suggestion(c.number)?.contains(search,true)==true || c.messages.any { it.text.contains(search, true) })
+    }.sortedWith(compareByDescending<Conversation> { it.pinned }.thenByDescending { it.messages.lastOrNull()?.timestamp ?: Long.MAX_VALUE })
 }
 
 fun normaliseNumber(number: String): String = number.filter(Char::isDigit)

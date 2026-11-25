@@ -56,6 +56,9 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
     val aiAccess by model.aiAccess.collectAsStateWithLifecycle()
     val drawer = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    var outbox by rememberSaveable { mutableStateOf(false) }
+    var schedule by rememberSaveable { mutableStateOf(false) }
+    var organize by rememberSaveable { mutableStateOf(false) }
     var newMessage by rememberSaveable { mutableStateOf(false) }
     var forwardedId by rememberSaveable { mutableStateOf<String?>(null) }
     var settings by rememberSaveable { mutableStateOf(false) }
@@ -71,19 +74,22 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
         if (state.watchReviewRequest != null && handledWatchReview != state.watchReviewRequest) {
             handledWatchReview = state.watchReviewRequest
             settings = false; watchSettings = false; headsetSettings = false; blockedSenders = false
-            newMessage = false; forwardedId = null; assistant = false; spamAction = null
+            newMessage = false; forwardedId = null; assistant = false; spamAction = null; outbox=false; schedule=false; organize=false
             drawer.close()
         }
     }
     LaunchedEffect(state.selected == null) { if (state.selected == null) spamAction = null }
-    LaunchedEffect(drawer.currentValue, drawer.targetValue, newMessage, settings, assistant, blockedSenders, headsetSettings, watchSettings, spamAction) {
-        model.setContentOverlayVisible(drawer.isOpen || drawer.targetValue == DrawerValue.Open || newMessage || settings || assistant || blockedSenders || headsetSettings || watchSettings || spamAction != null)
+    LaunchedEffect(drawer.currentValue, drawer.targetValue, newMessage, settings, assistant, blockedSenders, headsetSettings, watchSettings, spamAction, outbox, schedule, organize) {
+        model.setContentOverlayVisible(drawer.isOpen || drawer.targetValue == DrawerValue.Open || newMessage || settings || assistant || blockedSenders || headsetSettings || watchSettings || spamAction != null || outbox || schedule || organize)
     }
     if (state.error != null) AlertDialog(onDismissRequest = model::clearError, title = { Text("Sandesh needs attention") }, text = { Text(state.error.orEmpty()) }, confirmButton = { TextButton(onClick = model::clearError) { Text("OK") } })
+    if(outbox) { SendQueueScreen { outbox=false }; return }
     if (!state.ready) {
-        SmsSetup(state, onSetup, onAppSettings, model::savePreferences, onAccount, onBackup)
+        Column(Modifier.fillMaxSize()) { TextButton(onClick={outbox=true}) { Text("Scheduled & Undo") }; Box(Modifier.weight(1f)) { SmsSetup(state, onSetup, onAppSettings, model::savePreferences, onAccount, onBackup) } }
         return
     }
+    if(schedule) { ScheduleSmsScreen(state,model) { schedule=false }; return }
+    if(organize) { BusinessGroupScreen(state,model) { organize=false }; return }
     if (settings) {
         when {
             blockedSenders -> BlockedSendersScreen(state.blockedSenders, model::unblockSender) { blockedSenders = false }
@@ -122,7 +128,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
         BackHandler(enabled = state.selectedId != null && !drawer.isOpen && !newMessage && !settings && !assistant && !blockedSenders && !headsetSettings && spamAction == null) { model.back() }
         val navigation: @Composable () -> Unit = {
             Sidebar(state, onFolder = { model.folder(it); scope.launch { drawer.close() } },
-                onLine = { model.filter(it); scope.launch { drawer.close() } }, onNew = startMessage, onSettings = openSettings)
+                onLine = { model.filter(it); scope.launch { drawer.close() } }, onNew = startMessage, onSettings = openSettings, onQueue = { outbox=true; scope.launch { drawer.close() } })
         }
         val workspace: @Composable () -> Unit = {
             Scaffold(
@@ -159,7 +165,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
                     }
                     if (wide) VerticalDivider()
                     if (wide || state.selectedId != null) {
-                        Thread(state, Modifier.weight(1f), model, showHeader = wide, onAssistant = { task -> aiStartTask = task; assistant = true }, onSpamAction = { spamAction = it }, onReadMessage = onReadMessage, onForward = { id -> forwardedId = id; newMessage = true })
+                        Thread(state, Modifier.weight(1f), model, showHeader = wide, onAssistant = { task -> aiStartTask = task; assistant = true }, onSpamAction = { spamAction = it }, onReadMessage = onReadMessage, onForward = { id -> forwardedId = id; newMessage = true }, onSchedule = { schedule=true }, onOrganize = { organize=true })
                     }
 
                 }
@@ -186,7 +192,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
 }
 
 @Composable
-private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimLine?) -> Unit, onNew: () -> Unit, onSettings: () -> Unit) {
+private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimLine?) -> Unit, onNew: () -> Unit, onSettings: () -> Unit, onQueue: () -> Unit) {
     Column(Modifier.width(235.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow).statusBarsPadding().navigationBarsPadding()
         .padding(20.dp).verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
@@ -222,6 +228,7 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
         TextButton(onClick = { onLine(null) }) { Text("Show both lines", fontSize = 12.sp, color = Muted) }
         Spacer(Modifier.height(30.dp))
         Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Lock, null, Modifier.size(15.dp), tint = Muted); Spacer(Modifier.width(8.dp)); Text("Your conversations stay\non this device.", color = Muted, fontSize = 11.sp) }
+        TextButton(onClick = onQueue) { Icon(Icons.Outlined.Schedule,null); Spacer(Modifier.width(10.dp)); Text("Scheduled & Undo") }
         TextButton(onClick = onSettings, modifier = Modifier.padding(top = 16.dp)) { Icon(Icons.Outlined.Settings, null, Modifier.size(18.dp)); Spacer(Modifier.width(10.dp)); Text("Settings") }
         HorizontalDivider(Modifier.padding(vertical = 12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Sms, null, tint = Forest); Spacer(Modifier.width(10.dp)); Column { Text("Sandesh", fontSize = 14.sp, fontWeight = FontWeight.Medium); Text("On-device SMS", fontSize = 11.sp, color = Muted) } }
@@ -230,10 +237,20 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
 
 @Composable
 private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> Unit, onSearch: (String) -> Unit, onFilter: (SimLine?) -> Unit, onNew: () -> Unit, compact: Boolean = true, onNotifications: () -> Unit = {}, onContacts: () -> Unit = {}, onLoadMore: () -> Unit = {}) {
+    val groupOrder = linkedMapOf<String,Int>()
+    fun groupKey(c:Conversation)=if(state.preferences.groupBusinesses && !c.pinned) BusinessGroups.label(c.vendor,c.number)?.let { "vendor:"+it } ?: ("thread:"+c.id) else ("thread:"+c.id)
+    state.visible.forEachIndexed { index,c -> groupOrder.putIfAbsent(groupKey(c),index) }
+    val businessMembers=state.visible.filter { !it.pinned }.groupBy { BusinessGroups.label(it.vendor,it.number) }
+    val groupedVisible = state.visible.sortedBy { groupOrder[groupKey(it)] }
+    val expandedGroups = remember { mutableStateMapOf<String,Boolean>() }
+    val displayRows=groupedVisible.filter { c ->
+        val group=if(state.preferences.groupBusinesses && !c.pinned) BusinessGroups.label(c.vendor,c.number) else null
+        group==null || expandedGroups[group]==true || businessMembers[group]?.firstOrNull()?.id==c.id
+    }
     val list = key(state.folder, state.filterLine, state.query) { rememberLazyListState() }
     val atEnd by remember(list) { derivedStateOf { val info = list.layoutInfo; info.totalItemsCount > 0 && (info.visibleItemsInfo.maxOfOrNull { it.index } ?: -1) >= info.totalItemsCount - 6 } }
     LaunchedEffect(atEnd, state.inboxNext, state.loading, state.loadingMore, state.inboxPageError) {
-        if (atEnd && state.inboxNext != null && !state.loading && !state.loadingMore && state.inboxPageError == null) onLoadMore()
+        if (!state.preferences.groupBusinesses && atEnd && state.inboxNext != null && !state.loading && !state.loadingMore && state.inboxPageError == null) onLoadMore()
     }
     Column(modifier.fillMaxHeight()) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -264,10 +281,16 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
         if (state.pendingMms > 0) Text("MMS received: attachments are unavailable. See Settings.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
         if (state.visible.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(if (state.loading) "Loading conversations…" else if (state.query.isNotBlank()) "No matching conversations." else "A little space for new conversations.", Modifier.padding(24.dp), color = Muted, fontSize = 14.sp) }
         else LazyColumn(state = list, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 9.dp)) {
-            items(state.visible, key = { it.id }) { c ->
+            items(displayRows, key = { it.id }) { c ->
+                val group = if(state.preferences.groupBusinesses && !c.pinned) BusinessGroups.label(c.vendor,c.number) else null
+                val members = if(group!=null) businessMembers[group].orEmpty() else emptyList()
+                val firstInGroup = members.firstOrNull()?.id==c.id
+                if(group!=null && firstInGroup) TextButton(onClick={expandedGroups[group]=expandedGroups[group]!=true},modifier=Modifier.fillMaxWidth()) { Text("$group · "+members.size+" loaded conversations "+if(expandedGroups[group]==true) "▴" else "▾") }
+                if(group==null || expandedGroups[group]==true) {
                 val last = c.messages.lastOrNull()
                 Row(Modifier.fillMaxWidth().background(if (c.id == state.selectedId) Sage else Color.Transparent, RoundedCornerShape(10.dp))
                     .clickable { onSelect(c.id) }.padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.Top) {
+                    if(c.pinned) Icon(Icons.Outlined.PushPin,"Pinned",Modifier.size(14.dp),tint=Forest)
                     Avatar(c.initials, c.displayName); Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -284,6 +307,7 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
                         }
                     }
                 }
+            }
             }
             if (state.loadingMore || state.inboxPageError != null || state.inboxNext != null) item(key = "inbox-page") {
                 Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.Center) {
@@ -336,7 +360,7 @@ private fun ConversationHeader(c: Conversation, onBack: (() -> Unit)?, onStar: (
 }
 
 @Composable
-private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewModel, showHeader: Boolean, onAssistant: (AiTask) -> Unit, onSpamAction: (String) -> Unit, onReadMessage: (String) -> Unit, onForward: (String) -> Unit) {
+private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewModel, showHeader: Boolean, onAssistant: (AiTask) -> Unit, onSpamAction: (String) -> Unit, onReadMessage: (String) -> Unit, onForward: (String) -> Unit, onSchedule: () -> Unit, onOrganize: () -> Unit) {
     val c = state.selected
     if (c == null) {
         Box(modifier.fillMaxHeight(), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(30.dp)) { Icon(Icons.Outlined.Forum, null, Modifier.size(48.dp), tint = Forest); Text("Make a little connection.", fontSize = 22.sp, modifier = Modifier.padding(top = 20.dp)); Text("Choose a conversation to get started.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp)) } }
@@ -380,7 +404,7 @@ private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewMode
                 }
             }
         }
-        if (!c.spam && !c.blocked) ConversationComposer(state, model, onAssistant)
+        if (!c.spam && !c.blocked) ConversationComposer(state, model, onAssistant, onSchedule)
     }
 
 }

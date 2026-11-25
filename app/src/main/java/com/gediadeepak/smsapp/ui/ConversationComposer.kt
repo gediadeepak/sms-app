@@ -27,7 +27,7 @@ import com.gediadeepak.smsapp.SandeshViewModel
 import com.gediadeepak.smsapp.core.*
 
 @Composable
-internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, onAssistant: (AiTask) -> Unit) {
+internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, onAssistant: (AiTask) -> Unit, onSchedule: () -> Unit) {
     val conversation = state.selected ?: return
     val context = LocalContext.current
     val keyboardVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
@@ -92,13 +92,15 @@ internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, on
                         }
                     }, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.ContentPaste, "Paste text at cursor", Modifier.size(18.dp), tint = Muted) }
                     IconButton(onClick = model::polishDraft, enabled = state.draft.isNotBlank(), modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.Spellcheck, "Tidy draft with local rules", Modifier.size(18.dp), tint = Muted) }
-                    Button(onClick = model::send, enabled = state.draft.isNotBlank() && state.canSend, shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)) {
+                    IconButton(onClick=onSchedule,enabled=state.draft.isNotBlank() && state.canSend) { Icon(Icons.Outlined.Schedule,"Schedule SMS") }
+                    Button(onClick = { model.send() }, enabled = state.draft.isNotBlank() && state.canSend, shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)) {
                         Text("Send", fontSize = 14.sp); Spacer(Modifier.width(5.dp)); Icon(Icons.AutoMirrored.Outlined.Send, null, Modifier.size(16.dp))
                     }
                 }
             }
         }
         pasteError?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
+        PendingSendUndo(conversation.number)
         Text("SMS · ${state.draft.length} / ${ComposerRules.LIMIT}", fontSize = 10.sp, color = Muted, modifier = Modifier.padding(top = 6.dp))
         if (state.sendSubscriptionId == null) Text(if (state.subscriptions.isEmpty()) "Insert or enable a SIM to send SMS." else "Choose a sending SIM above. Set a default in Settings.", fontSize = 12.sp, color = Muted)
     }

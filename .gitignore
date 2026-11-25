@@ -22,3 +22,5 @@ watch-validation.log
 paging-validation.log
 wearable-validation.log
 face-validation.log
+
+sms-features-validation.log

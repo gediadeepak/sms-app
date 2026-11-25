@@ -4,7 +4,9 @@ import com.google.firebase.appcheck.FirebaseAppCheck
 import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 
 internal object AppCheckSetup {
-    const val verificationError = "This installation could not be verified for AI. Update Sandesh from its trusted distribution source or contact support."
+    const val isDevelopment = false
+    const val verificationError = "This phone could not be verified by Play Integrity. Install Sandesh through its configured release channel. The release signing SHA-256 and App Check Play Integrity settings must match the distributed build. Cloud backup and AI require verification."
+    fun debugToken(context: android.content.Context): String? = null
     fun install() {
         FirebaseAppCheck.getInstance().installAppCheckProviderFactory(PlayIntegrityAppCheckProviderFactory.getInstance())
     }

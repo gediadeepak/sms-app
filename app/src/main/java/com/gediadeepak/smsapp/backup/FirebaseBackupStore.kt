@@ -14,16 +14,36 @@ import java.security.MessageDigest
 import java.util.UUID
 
 /** Encrypted chunks in a private Firestore namespace; no Cloud Storage/billing-plan upgrade is performed. */
+data class CloudBackupSource(val id:String,val label:String,val updatedAt:Long)
+
 class FirebaseBackupStore(private val accounts: FirebaseAccounts) {
-    private val firestore by lazy { FirebaseFirestore.getInstance(accounts.app ?: error("Cloud backup is not configured.")).apply {
-        firestoreSettings = FirebaseFirestoreSettings.Builder().setLocalCacheSettings(MemoryCacheSettings.newBuilder().build()).build()
-    } }
+    private val firestore by lazy {
+        val app=accounts.app ?: error("Cloud backup is not configured.")
+        synchronized(clients) {
+            clients.getOrPut(app.name) {
+                FirebaseFirestore.getInstance(app).apply {
+                    firestoreSettings = FirebaseFirestoreSettings.Builder().setLocalCacheSettings(MemoryCacheSettings.newBuilder().build()).build()
+                }
+            }
+        }
+    }
     private val maxChunk = 400_000
-    suspend fun upload(bytes: ByteArray): Boolean {
+    suspend fun sources():List<CloudBackupSource> {
+        val uid=accounts.verifiedUid()
+        com.gediadeepak.smsapp.FirebaseVerification.check()
+        return firestore.collection("sandesh_accounts").document(uid).collection("state")
+            .orderBy("updatedAt",com.google.firebase.firestore.Query.Direction.DESCENDING).limit(50)
+            .get(Source.SERVER).await().documents.filter {validSource(it.id) && it.getString("backupId")!=null}.map {
+                CloudBackupSource(it.id,it.getString("label")?.take(80) ?: if(it.id=="latest") "Manual cloud backup" else "Automatic phone backup",it.getTimestamp("updatedAt")?.toDate()?.time ?: 0)
+            }
+    }
+    suspend fun upload(bytes: ByteArray, sourceId:String="latest", label:String="Manual cloud backup"): Boolean {
+        require(validSource(sourceId)) { "Invalid backup source." }
         require(bytes.size <= BackupCipher.MAX_ENCRYPTED_BYTES) { "Cloud backup is too large." }
         val uid = accounts.verifiedUid()
+        com.gediadeepak.smsapp.FirebaseVerification.check()
         val root = firestore.collection("sandesh_accounts").document(uid)
-        val pointer = root.collection("state").document("latest")
+        val pointer = root.collection("state").document(sourceId)
         val oldId = pointer.get(Source.SERVER).await().getString("backupId")
         val id = UUID.randomUUID().toString()
         val record = root.collection("backups").document(id)
@@ -42,7 +62,7 @@ class FirebaseBackupStore(private val accounts: FirebaseAccounts) {
         }
         check(accounts.profile().uid == uid) { "Account changed during backup." }
         // Publish only after every chunk has been acknowledged. A failed upload keeps the previous snapshot usable.
-        firestore.batch().update(record, "complete", true).set(pointer, mapOf("backupId" to id, "updatedAt" to FieldValue.serverTimestamp())).commit().await()
+        firestore.batch().update(record, "complete", true).set(pointer, mapOf("backupId" to id, "updatedAt" to FieldValue.serverTimestamp(), "label" to label.take(80))).commit().await()
         if (oldId != null && oldId != id && oldId.matches(Regex("[0-9a-f-]{36}"))) {
             return runCatching {
                 val old = root.collection("backups").document(oldId)
@@ -59,10 +79,12 @@ class FirebaseBackupStore(private val accounts: FirebaseAccounts) {
         }
         return true
     }
-    suspend fun downloadLatest(): ByteArray {
+    suspend fun downloadLatest(sourceId:String="latest"): ByteArray {
+        require(validSource(sourceId)) { "Invalid backup source." }
         val uid = accounts.verifiedUid()
+        com.gediadeepak.smsapp.FirebaseVerification.check()
         val root = firestore.collection("sandesh_accounts").document(uid)
-        val id = root.collection("state").document("latest").get(Source.SERVER).await().getString("backupId") ?: error("No cloud backup exists for this account yet.")
+        val id = root.collection("state").document(sourceId).get(Source.SERVER).await().getString("backupId") ?: error("No cloud backup exists for this source yet.")
         require(id.matches(Regex("[0-9a-f-]{36}"))) { "Cloud backup metadata is invalid." }
         val record = root.collection("backups").document(id)
         val metadata = record.get(Source.SERVER).await()
@@ -80,5 +102,10 @@ class FirebaseBackupStore(private val accounts: FirebaseAccounts) {
         return output.toByteArray().also { require(it.size.toLong() == size && sha256(it) == metadata.getString("sha256")) { "Cloud backup integrity check failed. Your inbox has not changed." } }
     }
     private fun sha256(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-    companion object { private const val MAX_CHUNKS = 50 }
+    companion object {
+        // Manual pages and background workers share one configured client. Settings cannot change after use.
+        private val clients=mutableMapOf<String,FirebaseFirestore>()
+        private const val MAX_CHUNKS = 50
+        fun validSource(id:String)=com.gediadeepak.smsapp.core.CloudBackupPolicy.validSource(id)
+    }
 }

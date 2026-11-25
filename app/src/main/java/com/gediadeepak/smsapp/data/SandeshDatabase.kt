@@ -6,13 +6,13 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.gediadeepak.smsapp.core.*
 
-data class ThreadMetadata(val starred: Boolean = false, val archived: Boolean = false, val alias: String = "", val spam: Boolean = false)
+data class ThreadMetadata(val starred: Boolean = false, val archived: Boolean = false, val alias: String = "", val spam: Boolean = false, val pinned: Boolean = false, val vendor: String = "")
 data class PendingSms(val key: String, val address: String, val text: String, val timestamp: Long, val subscriptionId: Int?)
 
 /** App metadata only: Android's SMS provider remains the source of truth for messages. */
-class SandeshDatabase private constructor(context: Context) : SQLiteOpenHelper(context, "sandesh.db", null, 3) {
+class SandeshDatabase private constructor(context: Context) : SQLiteOpenHelper(context, "sandesh.db", null, 4) {
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE thread_metadata (thread_id TEXT PRIMARY KEY, starred INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0, alias TEXT NOT NULL DEFAULT '', spam INTEGER NOT NULL DEFAULT 0)")
+        db.execSQL("CREATE TABLE thread_metadata (thread_id TEXT PRIMARY KEY, starred INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0, alias TEXT NOT NULL DEFAULT '', spam INTEGER NOT NULL DEFAULT 0, pinned INTEGER NOT NULL DEFAULT 0, vendor TEXT NOT NULL DEFAULT '')")
         db.execSQL("CREATE TABLE send_parts (sms_id TEXT NOT NULL, part INTEGER NOT NULL, sent INTEGER NOT NULL DEFAULT 0, delivered INTEGER NOT NULL DEFAULT 0, error INTEGER, PRIMARY KEY(sms_id, part))")
         db.execSQL("CREATE TABLE pending_mms (id INTEGER PRIMARY KEY AUTOINCREMENT, received_at INTEGER NOT NULL, subscription_id INTEGER, pdu BLOB NOT NULL)")
         createPendingTable(db)
@@ -21,6 +21,7 @@ class SandeshDatabase private constructor(context: Context) : SQLiteOpenHelper(c
     private fun createPendingTable(db: SQLiteDatabase) { db.execSQL("CREATE TABLE IF NOT EXISTS pending_sms (receipt_key TEXT PRIMARY KEY, address TEXT NOT NULL, body TEXT NOT NULL, stamp INTEGER NOT NULL, subscription_id INTEGER)") }
     private fun createBlockedTable(db: SQLiteDatabase) { db.execSQL("CREATE TABLE IF NOT EXISTS blocked_senders (sender_key TEXT PRIMARY KEY, address TEXT NOT NULL, added_at INTEGER NOT NULL)") }
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 4) { db.execSQL("ALTER TABLE thread_metadata ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0"); db.execSQL("ALTER TABLE thread_metadata ADD COLUMN vendor TEXT NOT NULL DEFAULT ''") }
         if (oldVersion < 2) createPendingTable(db)
         if (oldVersion < 3) { db.execSQL("ALTER TABLE thread_metadata ADD COLUMN spam INTEGER NOT NULL DEFAULT 0"); createBlockedTable(db) }
     }
@@ -53,20 +54,20 @@ class SandeshDatabase private constructor(context: Context) : SQLiteOpenHelper(c
     }
     fun acknowledgeIncoming(key: String) { writableDatabase.delete("pending_sms", "receipt_key=?", arrayOf(key)) }
     fun metadata(): Map<String, ThreadMetadata> = buildMap {
-        readableDatabase.query("thread_metadata", null, null, null, null, null, null).use { c ->
-            while (c.moveToNext()) put(c.getString(0), ThreadMetadata(c.getInt(1) != 0, c.getInt(2) != 0, c.getString(3), c.getInt(4) != 0))
+        readableDatabase.query("thread_metadata", arrayOf("thread_id","starred","archived","alias","spam","pinned","vendor"), null, null, null, null, null).use { c ->
+            while (c.moveToNext()) put(c.getString(0), ThreadMetadata(c.getInt(1) != 0, c.getInt(2) != 0, c.getString(3), c.getInt(4) != 0, c.getInt(5) != 0, c.getString(6)))
         }
     }
     fun threadMetadata(id: String?): ThreadMetadata? {
         if (id == null) return null
-        return readableDatabase.query("thread_metadata", arrayOf("starred", "archived", "alias", "spam"), "thread_id=?", arrayOf(id), null, null, null).use { c ->
-            if (c.moveToFirst()) ThreadMetadata(c.getInt(0) != 0, c.getInt(1) != 0, c.getString(2), c.getInt(3) != 0) else null
+        return readableDatabase.query("thread_metadata", arrayOf("starred", "archived", "alias", "spam", "pinned", "vendor"), "thread_id=?", arrayOf(id), null, null, null).use { c ->
+            if (c.moveToFirst()) ThreadMetadata(c.getInt(0) != 0, c.getInt(1) != 0, c.getString(2), c.getInt(3) != 0, c.getInt(4) != 0, c.getString(5)) else null
         }
     }
     @Synchronized fun updateMetadata(id: String, transform: (ThreadMetadata) -> ThreadMetadata) {
         val changed = transform(threadMetadata(id) ?: ThreadMetadata())
         writableDatabase.insertWithOnConflict("thread_metadata", null, ContentValues().apply {
-            put("thread_id", id); put("starred", if (changed.starred) 1 else 0); put("archived", if (changed.archived) 1 else 0); put("alias", changed.alias); put("spam", if (changed.spam) 1 else 0)
+            put("thread_id", id); put("starred", if (changed.starred) 1 else 0); put("archived", if (changed.archived) 1 else 0); put("alias", changed.alias); put("spam", if (changed.spam) 1 else 0); put("pinned", if (changed.pinned) 1 else 0); put("vendor", changed.vendor.take(40))
         }, SQLiteDatabase.CONFLICT_REPLACE)
     }
     fun prepareParts(smsId: String, count: Int) {

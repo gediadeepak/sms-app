@@ -37,7 +37,7 @@ data class InboxState(
     val historyLoading: Boolean = false, val historyPageError: String? = null,
 ) {
     val selected get() = conversations.find { it.id == selectedId }
-    val visible get() = inboxIds?.let { ids -> val byId = conversations.associateBy { it.id }; ids.mapNotNull(byId::get) }
+    val visible get() = inboxIds?.let { ids -> val byId = conversations.associateBy { it.id }; ids.mapNotNull(byId::get).sortedByDescending { it.pinned } }
         ?: filterConversations(conversations, folder, filterLine, query)
     val unreadCount get() = conversations.count { !it.archived && !it.spam && !it.blocked && it.unread > 0 }
     val ready get() = defaultSms && permissionsGranted
@@ -230,7 +230,9 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
                 val result = providerLoad { signal ->
                     repository.drainPendingIncoming()
                     val contactList = contactsRepository.load()
-                    val loaded = paging.inbox(sims, snapshot.folder, snapshot.filterLine, snapshot.query, null, inboxWindow, signal)
+                    val normal = paging.inbox(sims, snapshot.folder, snapshot.filterLine, snapshot.query, null, inboxWindow, signal)
+                    val pinned = if(snapshot.query.isBlank()) database.metadata().filterValues { it.pinned }.keys.take(10).mapNotNull { paging.thread(it,sims,signal) } else emptyList()
+                    val loaded = SmsPage((filterConversations(pinned,snapshot.folder,snapshot.filterLine,snapshot.query) + normal.items).distinctBy { it.id },normal.next)
                     val selected = snapshot.selectedId?.let { id -> loaded.items.find { it.id == id } ?: paging.thread(id, sims, signal) }
                     Triple(loaded, selected, contactList)
                 }
@@ -352,6 +354,18 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
         draft(polished)
     }
     fun sendSubscription(id: Int?) { mutableState.update { it.copy(sendSubscriptionId = id, sendLine = it.subscriptions.find { sim -> sim.subscriptionId == id }?.line ?: SimLine.UNKNOWN) } }
+    fun pin() {
+        val selected=state.value.selected ?: return
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    check(selected.pinned || database.metadata().count { it.value.pinned }<10) { "Unpin a conversation first (maximum ten)." }
+                    database.updateMetadata(selected.id) { it.copy(pinned=!it.pinned) }
+                }; refresh()
+            } catch(e:Exception) { reportError(e.message ?: "Could not pin conversation.") }
+        }
+    }
+    fun vendor(label:String) { editMetadata { it.copy(vendor=label.trim().take(40)) } }
     fun star() { editMetadata { it.copy(starred = !it.starred) } }
     fun archive() { editMetadata { it.copy(archived = !it.archived) }; back() }
     fun moveToSpam(block: Boolean) {
@@ -394,14 +408,18 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
         val id = state.value.selectedId ?: return
         viewModelScope.launch { withContext(Dispatchers.IO) { repository.updateMetadata(id, edit) }; refresh() }
     }
-    fun send() {
+    fun send(scheduledAt: Long? = null) {
         val s = state.value; val c = s.selected ?: return
         val text = s.draft.trim().takeIf { it.isNotBlank() } ?: return
         if (!s.canSend) { mutableState.update { it.copy(error = "Choose an active SIM and complete SMS setup first.") }; return }
         mutableState.update { it.copy(sending = true, error = null) }
         viewModelScope.launch {
             try {
-                withContext(Dispatchers.IO) { SmsTransport(context).send(c.number, text, s.sendSubscriptionId!!) }
+                withContext(Dispatchers.IO) {
+                    val due = SendPolicy.due(System.currentTimeMillis(),scheduledAt,s.preferences.undoSend)
+                    if(scheduledAt!=null || s.preferences.undoSend) com.gediadeepak.smsapp.scheduling.SendQueue.enqueue(context,c.number,text,s.sendSubscriptionId!!,due,c.id)
+                    else SmsTransport(context).send(c.number,text,s.sendSubscriptionId!!)
+                }
                 drafts.remove(c.id)
                 mutableState.update {
                     val askAgain = it.preferences.defaultSubscriptionId == null && it.subscriptions.size > 1

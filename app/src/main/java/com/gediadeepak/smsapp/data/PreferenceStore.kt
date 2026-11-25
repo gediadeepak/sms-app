@@ -17,10 +17,13 @@ class PreferenceStore(context: Context) {
         aiEnabled = storage.getBoolean("ai_enabled", false),
         aiSummaries = storage.getBoolean("ai_summaries", true),
         aiReplies = storage.getBoolean("ai_replies", true),
+        undoSend = storage.getBoolean("undo_send", true),
+        groupBusinesses = storage.getBoolean("group_businesses", false),
     )
     fun save(preferences: Preferences) { storage.edit().putString("personal", preferences.personalLabel).putString("work", preferences.workLabel)
         .putBoolean("suggestions", preferences.suggestions).putString("theme", preferences.theme.name)
         .putInt("default_subscription", preferences.defaultSubscriptionId ?: -1)
         .putBoolean("ai_enabled", preferences.aiEnabled).putBoolean("ai_summaries", preferences.aiSummaries)
-        .putBoolean("ai_replies", preferences.aiReplies).apply() }
+        .putBoolean("ai_replies", preferences.aiReplies).putBoolean("undo_send", preferences.undoSend)
+        .putBoolean("group_businesses", preferences.groupBusinesses).apply() }
 }

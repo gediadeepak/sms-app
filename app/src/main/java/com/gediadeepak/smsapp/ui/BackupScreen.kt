@@ -27,6 +27,8 @@ internal fun BackupHome(onNavigate: (AccountDestination) -> Unit) {
     PageHeading("Keep your messages close.", "Choose where to keep an encrypted copy of your SMS history.")
     BackupDestinationCard(Icons.Outlined.SaveAlt, "File backup & restore", "Save a password-protected file or restore one. No account needed.") { onNavigate(AccountDestination.FILES) }
     BackupDestinationCard(Icons.Outlined.CloudUpload, "Cloud backup & restore", "Keep an encrypted backup with your verified Sandesh account.") { onNavigate(AccountDestination.CLOUD) }
+    BackupDestinationCard(Icons.Outlined.Schedule,"Automatic backups","Daily or weekly encrypted folder/cloud backups and last-backup status.") {onNavigate(AccountDestination.AUTOMATIC)}
+    BackupStatusPanel()
     BackupLimits()
 }
 
@@ -83,11 +85,11 @@ internal fun CloudBackupPage(state: AccountState, smsReady: Boolean, onBackup: (
         Icon(Icons.Outlined.CloudUpload, null, Modifier.size(18.dp)); Spacer(Modifier.width(9.dp)); Text("Back up to cloud")
     }
     OutlinedButton(onClick = onRestore, enabled = !busy && smsReady && ready, modifier = Modifier.fillMaxWidth()) {
-        Icon(Icons.Outlined.CloudDownload, null, Modifier.size(18.dp)); Spacer(Modifier.width(9.dp)); Text("Restore latest cloud backup")
+        Icon(Icons.Outlined.CloudDownload, null, Modifier.size(18.dp)); Spacer(Modifier.width(9.dp)); Text("Choose cloud backup to restore")
     }
     HorizontalDivider()
     Text("Keep your backup password safe", fontWeight = FontWeight.SemiBold)
-    Text("It is separate from your account password and cannot be reset. A completed cloud upload replaces your previous backup.", color = Muted, fontSize = 14.sp, lineHeight = 23.sp)
+    Text("It is separate from your account password and cannot be reset. A manual cloud upload replaces the shared manual copy. Automatic cloud copies stay separate for each phone.", color = Muted, fontSize = 14.sp, lineHeight = 23.sp)
     BackupLimits()
 }
 
@@ -141,5 +143,15 @@ internal fun BackupPasswordScreen(creating: Boolean, onDismiss: () -> Unit, onCo
             }, modifier = Modifier.fillMaxWidth()) { Text(if (creating) "Create backup" else "Verify backup") }
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
+    }
+}
+
+@Composable
+private fun BackupStatusPanel() {
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val prefs=context.getSharedPreferences("sandesh_backup_status",android.content.Context.MODE_PRIVATE)
+    for(kind in listOf("file","cloud")) {
+        val stamp=prefs.getLong(kind,0)
+        Text(if(stamp==0L) "No completed $kind backup on this device." else "Last $kind backup: "+DateFormat.getDateTimeInstance().format(Date(stamp)),style=MaterialTheme.typography.bodySmall)
     }
 }

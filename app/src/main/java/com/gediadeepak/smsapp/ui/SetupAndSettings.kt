@@ -91,6 +91,12 @@ internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, on
             SettingsSection("Appearance", preferences.theme.label, expanded == "appearance", { toggle("appearance") }) {
                 ThemeOptions(preferences.theme) { onSave(preferences.copy(theme = it)) }
             }
+            SettingsSection("Sending & organization", "Undo send and business groups", expanded == "sending", { toggle("sending") }) {
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text("Hold Send for 10 seconds"); Switch(checked=preferences.undoSend,onCheckedChange={onSave(preferences.copy(undoSend=it))}) }
+                Text("Undo is available before Android starts sending. Upcoming messages and cancellation are in Scheduled & Undo in the navigation drawer.",style=MaterialTheme.typography.bodySmall)
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text("Group business senders"); Switch(checked=preferences.groupBusinesses,onCheckedChange={onSave(preferences.copy(groupBusinesses=it))}) }
+                Text("Local sender rules and your custom group labels. No messages are uploaded or merged. Pin up to ten chats from the conversation toolbar.",style=MaterialTheme.typography.bodySmall)
+            }
             SettingsSection("SIM cards", "Labels and default sending SIM", expanded == "sim", { toggle("sim") }) {
                 OutlinedTextField(value = personal, onValueChange = { personal = it.take(18) }, label = { Text("SIM 1 label") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(value = work, onValueChange = { work = it.take(18) }, label = { Text("SIM 2 label") }, singleLine = true, modifier = Modifier.fillMaxWidth())

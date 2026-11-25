@@ -14,8 +14,8 @@ android {
         applicationId = "com.sandesh.app"
         minSdk = 24
         targetSdk = 37
-        versionCode = 15
-        versionName = "0.9.0"
+        versionCode = 16
+        versionName = "0.10.0"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -42,6 +42,8 @@ android {
 }
 
 dependencies {
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
+    implementation("androidx.documentfile:documentfile:1.1.0")
     implementation(project(":core"))
     implementation(project(":watch-protocol"))
     implementation("com.google.android.gms:play-services-wearable:20.0.1")
