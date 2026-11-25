@@ -1,10 +1,35 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
     <uses-feature android:name="android.hardware.type.watch" android:required="true" />
-    <application android:label="Sandesh" android:icon="@drawable/sandesh_logo" android:theme="@style/WatchTheme" android:allowBackup="false" android:fullBackupContent="false" android:supportsRtl="true">
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="com.google.android.permission.PROVIDE_BACKGROUND" />
+    <application android:label="Sandesh" android:icon="@drawable/sandesh_icon" android:theme="@style/WatchTheme" android:allowBackup="false" android:fullBackupContent="false" android:supportsRtl="true">
+        <uses-library android:name="com.google.android.wearable" android:required="false" />
         <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version" />
         <meta-data android:name="com.google.android.wearable.standalone" android:value="false" />
         <activity android:name=".WatchActivity" android:exported="true" android:excludeFromRecents="true">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
         </activity>
+        <activity android:name=".face.FaceDesignerActivity" android:exported="true" android:label="Sandesh watch faces">
+            <intent-filter>
+                <action android:name="com.sandesh.app.CONFIGURE_FACE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="com.google.android.wearable.watchface.category.WEARABLE_CONFIGURATION" />
+            </intent-filter>
+        </activity>
+        <service android:name=".face.SandeshFaceService" android:label="Sandesh Retro &amp; Custom" android:permission="android.permission.BIND_WALLPAPER" android:exported="true">
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/watch_face" />
+            <meta-data android:name="com.google.android.wearable.watchface.preview" android:resource="@drawable/face_preview" />
+            <meta-data android:name="com.google.android.wearable.watchface.preview_circular" android:resource="@drawable/face_preview" />
+            <meta-data android:name="com.google.android.wearable.watchface.wearableConfigurationAction" android:value="com.sandesh.app.CONFIGURE_FACE" />
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+                <category android:name="com.google.android.wearable.watchface.category.WATCH_FACE" />
+            </intent-filter>
+        </service>
+        <activity android:name=".face.FaceApplyActivity" android:exported="false" />
+        <!-- Legacy GMS 8.7 on Sony requires this listener action; handler rejects all non-face paths. -->
+        <service android:name=".face.FaceConfigService" android:exported="true" tools:ignore="WearableBindListener">
+            <intent-filter><action android:name="com.google.android.gms.wearable.BIND_LISTENER" /></intent-filter>
+        </service>
     </application>
 </manifest>

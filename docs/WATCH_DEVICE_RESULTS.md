@@ -14,3 +14,16 @@ Passed on the actual connected devices:
 No SMS Send control or carrier transport was invoked. Diagnostic output included command/status only. These results do not establish all theme/layout combinations, the one-minute active-view expiry, disconnected revocation, permission loss, background reconnect, unread semantics or every phone-notification navigation case; those remain in WATCH_APP.md's device checklist.
 
 Local validation: 33 core tests plus 2 protocol tests passed; phone/watch debug and optimized release APKs, phone release bundle and both variants' lint tasks completed successfully. Release signing/publication requirements in RELEASE.md still apply.
+
+## Watch faces — Sandesh 0.9.0 (code 15)
+
+Verified on the same Sony SmartWatch 3 (API 23, Play services 8.7) and Samsung phone:
+
+- Phone designer opened through Settings → Smartwatch → Smartwatch settings. Final phone screenshot was inspected: square LCD preview, dark page preserved, saved-face controls readable.
+- Phone gallery request returned the real watch gallery successfully.
+- Phone Apply returned `apply / applied` on the watch and “Face applied on your watch” on the phone. Sandesh was already selected in the system watch-face picker; its wallpaper component was confirmed active. First-time picker confirmation remains a manual platform step.
+- Native debug fixtures rendered the display-only LCD and dual-panel retro clock. Active and ambient render assertions passed. All 30 style/color combinations preserved the pixels outside their preview bounds on the physical Sony.
+- The earlier launcher crash was a Google launcher OOM while decoding the full-size app logo. The final watch APK uses the same hand/envelope artwork at 128px in drawable-nodpi; the full-size image is debug-only. The watch designer and clock service ran after replacement.
+- Final phone/watch debug APKs and debug lint passed; 38 core/protocol tests passed with zero failures. Watch optimized release build and lint passed. Phone optimized release APK, bundle and release lint also passed before the last phone preview-sizing/connection-timeout refinement; those refinements were rechecked in the distributed debug build. Firebase/sign-in resources were verified in debug and optimized phone APKs.
+
+Distributed APKs are development-signed test builds. No SMS was sent during face tests, and exported face fixtures contain generated clock data only. G-TiDE R1 compatibility was not established by these Sony tests.

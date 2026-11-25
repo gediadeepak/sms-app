@@ -21,3 +21,4 @@ appcheck-debug.local.properties
 watch-validation.log
 paging-validation.log
 wearable-validation.log
+face-validation.log

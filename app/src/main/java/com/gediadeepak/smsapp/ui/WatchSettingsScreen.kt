@@ -19,6 +19,8 @@ import com.gediadeepak.smsapp.telephony.WatchInboxService
 
 @Composable
 internal fun WatchSettingsScreen(status: SmsNotificationStatus, onNotifications: () -> Unit, onBack: () -> Unit) {
+    var designer by remember { mutableStateOf(false) }
+    if (designer) { WatchFacesScreen(onBack = { designer = false }); return }
     val context = LocalContext.current
     val store = remember(context) { WatchSettings(context) }
     var options by remember { mutableStateOf(store.load()) }
@@ -33,6 +35,8 @@ internal fun WatchSettingsScreen(status: SmsNotificationStatus, onNotifications:
             Text("Sony SmartWatch 3", style = MaterialTheme.typography.titleLarge)
             Text("Phone notification support for Android Wear 1.5. Pair the watch with your phone using its Android Wear / Wear OS companion app, allow notification access there, and make sure Sandesh is not blocked.", color = Muted, lineHeight = 23.sp)
             Text("Install the separate Sandesh watch APK over USB to add a launcher inbox on Sony SmartWatch 3. It shows ten recent conversations and five recent messages when you choose one. This old watch does not support modern Wear OS tiles.", color = Muted, fontSize = 13.sp, lineHeight = 21.sp)
+            Button(onClick = { designer = true }, modifier = Modifier.fillMaxWidth()) { Text("Create & apply watch faces") }
+            Text("Create and choose watch faces here on your phone, or open Sandesh on the watch and tap Faces. Confirm Sandesh in the watch picker the first time. Designs stay on the watch and need no SMS or cloud access.", color = Muted, fontSize = 13.sp, lineHeight = 21.sp)
             OutlinedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     WatchToggle("Enable watch inbox", "Allow the paired Sandesh watch app to request names and SMS previews. Off by default. Refresh from the watch to load.", options.inbox) { save(options.copy(inbox = it)) }

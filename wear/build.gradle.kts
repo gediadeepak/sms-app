@@ -1,13 +1,15 @@
 plugins { alias(libs.plugins.android.application) }
 android {
+    sourceSets.getByName("main").java.srcDir(rootProject.file("shared-face/src/main/java"))
+    sourceSets.getByName("debug").java.srcDir(rootProject.file("shared-face/src/debug/java"))
     namespace = "com.sandesh.watch"
     compileSdk { version = release(37) }
     defaultConfig {
         applicationId = "com.sandesh.app"
         minSdk = 23
         targetSdk = 23 // Sony SWR50 / Android Wear 1.5, not a modern Play Store watch release.
-        versionCode = 14
-        versionName = "0.8.0"
+        versionCode = 15
+        versionName = "0.9.0"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     buildTypes { release { isMinifyEnabled = true; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro") } }
@@ -27,4 +29,7 @@ dependencies {
     implementation(project(":watch-protocol"))
     // Deliberate compatibility pin: the connected Sony watch has Google Play services 8.7.
     implementation("com.google.android.gms:play-services-wearable:8.4.0")
+    // Oldest support artifact still published by Google; API-23 face path is tested on the Sony.
+    implementation("com.google.android.support:wearable:2.1.0")
+    compileOnly("com.google.android.wearable:wearable:2.1.0")
 }

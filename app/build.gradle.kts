@@ -6,14 +6,16 @@ plugins {
 if (file("google-services.json").exists()) { apply(plugin = "com.google.gms.google-services") }
 
 android {
+    sourceSets.getByName("main").java.srcDir(rootProject.file("shared-face/src/main/java"))
+    sourceSets.getByName("debug").java.srcDir(rootProject.file("shared-face/src/debug/java"))
     namespace = "com.gediadeepak.smsapp"
     compileSdk { version = release(37) }
     defaultConfig {
         applicationId = "com.sandesh.app"
         minSdk = 24
         targetSdk = 37
-        versionCode = 14
-        versionName = "0.8.0"
+        versionCode = 15
+        versionName = "0.9.0"
     }
     buildFeatures { compose = true }
     compileOptions {

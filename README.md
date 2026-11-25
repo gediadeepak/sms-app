@@ -45,6 +45,7 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 - **Lazy loading:** 50 conversation previews initially, then 50 more near the inbox end. Threads load the latest 50 messages and fetch older pages as you scroll up. Search includes unloaded older text. See [paging behaviour and device checks](docs/PAGING.md).
 - **Settings → Smartwatch** adds opt-in Sony SmartWatch 3 notification actions: Mark read and Draft reply for phone review. Sender/body previews are separately optional and also affect phone notifications. Includes a mirroring test alert. These actions work without installing the separate watch app; see [notification setup and tests](docs/SMARTWATCH.md).
 - The separate **Sandesh mini watch inbox** (`wear` module) adds a launcher icon, ten recent conversations, five-message previews, Refresh and Open on phone on Sony SmartWatch 3 / API 23. It needs the matching phone app and a separate watch-inbox opt-in. See [watch APK setup](docs/WATCH_APP.md).
+- **Watch face designer** on phone and watch creates, saves and applies retro LCD, dual-panel retro, digital, analog and minimal clocks with six colors and a low-power ambient display. See [face controls and first-time application](docs/WATCH_FACES.md).
 - **AI reply** drafts directly in the conversation composer from recent eligible history, with tone controls and alternatives. Existing text is preserved; typing during generation prevents automatic insertion. Summaries and full text previews remain available.
 
 ## First launch

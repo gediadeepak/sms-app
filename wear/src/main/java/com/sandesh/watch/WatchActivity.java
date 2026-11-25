@@ -155,7 +155,12 @@ public final class WatchActivity extends Activity implements GoogleApiClient.Con
     private void base(String heading) {
         content.removeAllViews(); content.setBackgroundColor(background);
         ((View)content.getParent()).setBackgroundColor(background);
-        text("Sandesh",22,ink,true);
+        LinearLayout headingRow=new LinearLayout(this); headingRow.setOrientation(LinearLayout.HORIZONTAL); headingRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        TextView title=new TextView(this); title.setText("Sandesh"); title.setTextSize(21); title.setTextColor(ink); title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        headingRow.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        Button faces=new Button(this); faces.setText("Faces"); faces.setAllCaps(false); faces.setTextSize(11); faces.setContentDescription("Create and apply watch faces");
+        faces.setOnClickListener(v->startActivity(new android.content.Intent(this,com.sandesh.watch.face.FaceDesignerActivity.class)));
+        headingRow.addView(faces,new LinearLayout.LayoutParams(dp(58),dp(48))); content.addView(headingRow);
         text(heading,12,muted,false);
     }
     private void showStatus(String message) {
