@@ -21,6 +21,7 @@ enum class SmsNotificationStatus { ENABLED, PERMISSION_REQUIRED, APP_BLOCKED, CH
 
 object SmsNotifications {
     private const val CHANNEL = "sandesh_sms"
+    private const val INCOMING_TAG = "sandesh.incoming"
     private fun manager(context: Context) = context.getSystemService(NotificationManager::class.java)
 
     fun ensureChannel(context: Context) {
@@ -47,26 +48,55 @@ object SmsNotifications {
         } else Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
     } else Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
 
-    private fun post(context: Context, id: Int, title: String, text: String, intent: Intent, readSmsId: String? = null): Boolean {
+    private fun post(context: Context, id: Int, title: String, text: String, intent: Intent, readSmsId: String? = null,
+        tag: String? = null, silent: Boolean = false, localOnly: Boolean = false, configure: (NotificationCompat.Builder) -> Unit = {}): Boolean {
         ensureChannel(context)
         if (status(context) != SmsNotificationStatus.ENABLED) return false
-        val pending = PendingIntent.getActivity(context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val reviewFlags = if (intent.action == WatchNotifications.REVIEW) PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_ONE_SHOT else PendingIntent.FLAG_UPDATE_CURRENT
+        val pending = PendingIntent.getActivity(context, id, intent, reviewFlags or PendingIntent.FLAG_IMMUTABLE)
         val builder = NotificationCompat.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title).setContentText(text).setContentIntent(pending).setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH).setDefaults(NotificationCompat.DEFAULT_SOUND)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE).setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setLocalOnly(localOnly).setSilent(silent)
+            .setPublicVersion(NotificationCompat.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle("Sandesh").setContentText("Open Sandesh to view this alert.").build())
         if (readSmsId != null && HeadsetReadout.selected(context) != null) {
             val action = Intent(context, ReadSmsActionReceiver::class.java).setAction(HeadsetReadout.READ)
                 .setData(Uri.parse("sandesh://read/$readSmsId")).putExtra("sms_id", readSmsId)
             val read = PendingIntent.getBroadcast(context, 0, action, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             builder.addAction(NotificationCompat.Action.Builder(android.R.drawable.ic_media_play, "Read message", read).setAuthenticationRequired(true).build())
         }
-        return try { manager(context).notify(id, builder.build()); true }
+        configure(builder)
+        return try { manager(context).notify(tag, id, builder.build()); true }
         catch (_: SecurityException) { false }
     }
 
-    fun incoming(context: Context, thread: String, number: String, smsId: String? = null) = post(context, thread.hashCode(), "New SMS", "Open Sandesh to read your message.",
-        Intent(context, MainActivity::class.java).setAction(Intent.ACTION_VIEW).setData(Uri.parse("sandesh://thread/$thread")).putExtra("thread_id", thread), smsId)
+    fun incoming(context: Context, thread: String, number: String, smsId: String? = null, silent: Boolean = false): Boolean {
+        // Upgrades used untagged notifications. Remove the old card before posting its replacement.
+        manager(context).cancel(thread.hashCode())
+        val options = WatchSettings(context).load()
+        val message = if (smsId != null && (options.actions || options.previews))
+            runCatching { WatchNotifications.message(context, thread, smsId) }.getOrNull() else null
+        return post(context, thread.hashCode(), "New SMS", "Open Sandesh to read your message.",
+            Intent(context, MainActivity::class.java).setAction(Intent.ACTION_VIEW).setData(Uri.parse("sandesh://thread/$thread")).putExtra("thread_id", thread),
+            smsId, tag = "$INCOMING_TAG.$thread", silent = silent) { builder ->
+            if (message != null) runCatching { WatchNotifications.extend(context, builder, message, options) }
+        }
+    }
+
+    /** Revoke old preview/action cards immediately when either watch opt-in changes. */
+    fun clearWatchNotifications(context: Context) {
+        manager(context).activeNotifications.filter { it.tag?.startsWith("$INCOMING_TAG.") == true || it.tag == INCOMING_TAG || it.tag?.startsWith("sandesh.watch-draft.") == true }
+            .forEach { manager(context).cancel(it.tag, it.id) }
+    }
+
+    internal fun watchDraft(context: Context, message: WatchMessage, body: String) = post(context, message.thread.hashCode(),
+        "Watch reply ready to review", "Open Sandesh, review your reply, choose a SIM and tap Send. Nothing has been sent.",
+        WatchNotifications.reviewIntent(context, message, body), tag = "sandesh.watch-draft.${message.thread}", localOnly = true)
+
+    fun watchTest(context: Context) = post(context, -105, "Sandesh watch test", "If this alert appears on your watch, notification mirroring is working. No SMS was sent.",
+        Intent(context, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
     fun readoutForeground(context: Context, body: Boolean, testing: Boolean): Notification {
         val stop = PendingIntent.getBroadcast(context, -104, Intent(context, ReadSmsActionReceiver::class.java).setAction(HeadsetReadout.STOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val open = PendingIntent.getActivity(context, -104, Intent(context, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -75,7 +105,11 @@ object SmsNotifications {
             .setContentText("Tap Stop to end playback.").setContentIntent(open).setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .addAction(android.R.drawable.ic_media_pause, "Stop", stop).build()
     }
-    fun cancel(context: Context, thread: String) = manager(context).cancel(thread.hashCode())
+    fun cancel(context: Context, thread: String) {
+        manager(context).cancel(thread.hashCode())
+        manager(context).cancel(INCOMING_TAG, thread.hashCode())
+        manager(context).cancel("$INCOMING_TAG.$thread", thread.hashCode())
+    }
     fun failure(context: Context, message: String) = post(context, -100, "Sandesh needs attention", message, Intent(context, MainActivity::class.java))
     fun mms(context: Context) = post(context, -101, "MMS received — attachments unavailable", "This SMS-only build cannot display MMS. Open Sandesh for details.", Intent(context, MainActivity::class.java))
     fun draft(context: Context, number: String, body: String) = post(context, -102, "Review your SMS reply", "Choose a SIM and tap Send in Sandesh.",

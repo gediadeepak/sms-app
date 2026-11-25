@@ -105,6 +105,8 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 
 ## Message actions, contacts and inline AI (0.6.0)
 
+For the later 0.6.1 smartwatch integration, also complete the pairing, delayed Mark read, draft handoff, privacy and disconnection checks in [SMARTWATCH.md](SMARTWATCH.md). The watch must be paired before device compatibility can be claimed.
+
 - Contacts permission is optional: test allow, deny, permanent denial/settings, revoke and regrant without losing SMS access. Names refresh after editing/deleting a contact and disappear after revocation. No contact data is copied into backups or AI metadata.
 - Match national/international formats, different country codes with shared suffixes and ambiguous duplicates. Only a full normalized match may hide the number in inbox/thread headers. Unknown and alphanumeric senders retain their original identity.
 - New message/Forward are full pages. Search contacts by name (including accents) and partial formatted number; select among multiple phone entries and recent conversations. Verify recipient and SIM; retain manual alias support.

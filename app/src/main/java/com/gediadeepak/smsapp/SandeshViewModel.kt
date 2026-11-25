@@ -29,6 +29,7 @@ data class InboxState(
     val notificationStatus: SmsNotificationStatus = SmsNotificationStatus.ENABLED,
     val blockedSenders: List<String> = emptyList(),
     val contactsGranted: Boolean = false, val contacts: List<PhoneContact> = emptyList(),
+    val watchReviewRequest: String? = null,
 ) {
     val selected get() = conversations.find { it.id == selectedId }
     val visible get() = filterConversations(conversations, folder, filterLine, query)
@@ -352,6 +353,21 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
         val previous = state.value.preferences.defaultSubscriptionId
         preferences.save(value); mutableState.update { it.copy(preferences = value) }
         if (previous != value.defaultSubscriptionId) sendSubscription(resolveSendingSubscription(value.defaultSubscriptionId, state.value.subscriptions.map { it.subscriptionId }))
+    }
+    fun openWatchDraft(threadId: String?, body: String?) {
+        viewModelScope.launch {
+            refreshJob?.join()
+            val conversation = state.value.conversations.find { it.id == threadId }
+            if (!state.value.ready || conversation == null || conversation.spam || conversation.blocked || !validNumber(conversation.number)) {
+                reportError("This watch reply can no longer be opened. Check SMS access and the conversation in Sandesh. Nothing was sent."); return@launch
+            }
+            val existing = if (state.value.selectedId == threadId) state.value.draft else drafts[threadId]?.first.orEmpty()
+            val combined = WatchReplyRules.merge(existing, body)
+            if (combined == null) { reportError("The watch reply and existing draft exceed 1,600 characters or the reply is empty. Your existing draft was kept. Nothing was sent."); return@launch }
+            select(conversation.id)
+            draft(combined)
+            mutableState.update { it.copy(folder = Folder.INBOX, query = "", filterLine = null, watchReviewRequest = java.util.UUID.randomUUID().toString()) }
+        }
     }
     fun openExternal(number: String?, body: String?, threadId: String?) {
         viewModelScope.launch {

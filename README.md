@@ -42,6 +42,7 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 - Optional Firebase AI Logic conversation summaries and reply drafts, with independent settings, a preview before sharing, sensitive-message heuristics and local request limits. Generated replies never send automatically; existing drafts are preserved. App Check uses the debug provider locally and Play Integrity in release. AI settings/results are excluded from backups; restore disables AI.
 
 - Message actions: long-press a bubble or tap its menu to **Copy**, **Forward** or **Share**. Paste respects the composer cursor/selection. Forwarding opens a recipient picker and prepares an editable draft; only the normal Send button transmits SMS.
+- **Settings → Smartwatch** adds opt-in Sony SmartWatch 3 notification actions: Mark read and Draft reply for phone review. Sender/body previews are separately optional and also affect phone notifications. Includes a mirroring test alert. This is phone-side support, not a watch app; see [setup and required device tests](docs/SMARTWATCH.md).
 - **AI reply** drafts directly in the conversation composer from recent eligible history, with tone controls and alternatives. Existing text is preserved; typing during generation prevents automatic insertion. Summaries and full text previews remain available.
 
 ## First launch

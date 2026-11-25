@@ -1,8 +1,8 @@
-# Sandesh privacy notes (0.6.0)
+# Sandesh privacy notes (0.6.1)
 
 This documents implemented behaviour. The owner must supply a hosted policy, support contact and retention/deletion terms before publication.
 
-Sandesh reads and writes SMS after you make it the default SMS app and grant permissions. Phone-state access identifies active SIMs. Carrier SMS travels through your mobile operator to the recipient when you tap Send. Notifications use a generic message preview.
+Sandesh reads and writes SMS after you make it the default SMS app and grant permissions. Phone-state access identifies active SIMs. Carrier SMS travels through your mobile operator to the recipient when you tap Send. Notifications use a generic message preview unless sender/body previews are enabled in Smartwatch settings.
 
 SMS is held in Android's system SMS provider. Sandesh's private SQLite database stores stars, archives, aliases, spam flags, an app-local blocked-sender list, send/delivery receipts, pending incoming SMS and raw unsupported MMS notifications. These records can contain message content. Preferences store appearance and sending choices. Android protects this local storage; the backup password does not encrypt the running app's database. Automatic Android app-data backup/device transfer remains excluded.
 
@@ -33,3 +33,7 @@ Contact lookup and recipient search use optional READ_CONTACTS permission. Sande
 Copy puts only the selected message body on the system clipboard and marks it sensitive to suppress previews where Android supports that flag. The clipboard is managed by Android. Paste reads text only when requested and respects the selected composer range. Share opens the Android Sharesheet with only that message body; the app/target you choose receives it. Forwarding prepares an editable SMS draft for the selected number and does not transmit it automatically. Contact names, sender numbers and dates are not added to copied/shared/forwarded message bodies. These bodies may already contain personal information.
 
 The inline AI reply action uses the same filtered, bounded conversation context and Google processing as the full-screen AI page. The first suggestion is inserted only if the draft is unchanged since the request, and existing draft text is preserved. Alternatives replace only a previously inserted AI segment while that full draft remains unchanged; otherwise they append without replacing user edits. Sending always requires a separate user action. Drafts remain process-memory-only until sent.
+
+Smartwatch actions and sender/body previews have separate device-local opt-ins, excluded from backups. The Android Wear / Wear OS companion app handles pairing, notification access and mirroring. Preview opt-in shows sender/contact name and bounded message body on phone notifications and paired watches, potentially including OTPs. Public lock-screen content stays generic, subject to Android/companion/watch settings. Changing either option clears incoming and pending watch-review cards, not SMS; disconnected watches may retain already received previews.
+
+Mark read changes read flags only through the message on its alert. Draft reply receives Android RemoteInput text and posts a private phone-only review notification. Android temporarily holds the body in that notification's PendingIntent, outside Sandesh's database and backups. A new pending watch reply for the same thread replaces the previous review alert. Opening it appends to the phone draft or rejects overflow without replacing existing text. Sending requires the normal phone Send action. Voice input, mirroring and retention are controlled by the companion/input software and may use its own services; Sandesh does not invoke Gemini or headset TTS for watch actions.

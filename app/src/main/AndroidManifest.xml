@@ -46,6 +46,7 @@
             <intent-filter><action android:name="android.provider.Telephony.WAP_PUSH_DELIVER" /><data android:mimeType="application/vnd.wap.mms-message" /></intent-filter>
         </receiver>
         <receiver android:name=".telephony.SmsResultReceiver" android:exported="false" />
+        <receiver android:name=".telephony.WatchActionReceiver" android:exported="false" />
         <receiver android:name=".audio.ReadSmsActionReceiver" android:exported="false" />
         <!-- API-specific playback code is unreachable before Android 9; SMS remains supported on API 24+. -->
         <service android:name=".audio.HeadsetReadoutService" android:enabled="@bool/headset_readout_supported" tools:targetApi="28" android:exported="false" android:foregroundServiceType="mediaPlayback" android:stopWithTask="true" />

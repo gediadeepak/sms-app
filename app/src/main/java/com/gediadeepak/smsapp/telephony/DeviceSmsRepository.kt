@@ -61,6 +61,17 @@ class DeviceSmsRepository(private val context: Context) {
         resolver.update(Telephony.Sms.CONTENT_URI, ContentValues().apply { put("read", 1); put("seen", 1) }, "thread_id=? AND read=0", arrayOf(thread))
         SmsNotifications.cancel(context, thread)
     }
+    /** A delayed watch action must never mark a newer, unseen SMS read. */
+    fun markReadThrough(thread: String, id: String, date: Long): Unit = synchronized(incomingLock) {
+        if (!SmsAccess.ready(context)) return
+        resolver.update(Telephony.Sms.Inbox.CONTENT_URI, ContentValues().apply { put("read", 1); put("seen", 1) },
+            "thread_id=? AND read=0 AND _id<=? AND date<=?", arrayOf(thread, id, date.toString()))
+        val latest = resolver.query(Telephony.Sms.Inbox.CONTENT_URI, arrayOf("_id", "address"), "thread_id=? AND read=0", arrayOf(thread), "date DESC, _id DESC")?.use {
+            if (it.moveToFirst()) it.getString(0) to it.getString(1).orEmpty() else null
+        }
+        if (latest == null) SmsNotifications.cancel(context, thread)
+        else SmsNotifications.incoming(context, thread, latest.second, latest.first, silent = true)
+    }
     fun updateMetadata(thread: String, edit: (com.gediadeepak.smsapp.data.ThreadMetadata) -> com.gediadeepak.smsapp.data.ThreadMetadata) = database.updateMetadata(thread, edit)
 
     fun receive(intent: android.content.Intent): String? {

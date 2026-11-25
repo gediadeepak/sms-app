@@ -25,6 +25,7 @@ import com.gediadeepak.smsapp.ui.SandeshSplash
 import com.gediadeepak.smsapp.telephony.SmsAccess
 import com.gediadeepak.smsapp.telephony.SmsNotifications
 import com.gediadeepak.smsapp.telephony.SmsNotificationStatus
+import com.gediadeepak.smsapp.telephony.WatchNotifications
 import com.gediadeepak.smsapp.audio.HeadsetReadout
 import com.gediadeepak.smsapp.account.AccountViewModel
 import com.gediadeepak.smsapp.ui.AccountBackupFlow
@@ -55,6 +56,13 @@ class MainActivity : ComponentActivity() {
             val state by model.state.collectAsStateWithLifecycle()
             val accountState by account.state.collectAsStateWithLifecycle()
             var accountDestination by rememberSaveable { mutableStateOf<AccountDestination?>(null) }
+            var handledWatchReview by rememberSaveable { mutableStateOf<String?>(null) }
+            LaunchedEffect(state.watchReviewRequest) {
+                if (state.watchReviewRequest != null && handledWatchReview != state.watchReviewRequest) {
+                    handledWatchReview = state.watchReviewRequest
+                    accountDestination = null
+                }
+            }
             var showSplash by rememberSaveable { mutableStateOf(savedInstanceState == null) }
             LaunchedEffect(state.ready, showSplash, accountDestination) {
                 if (state.ready && !showSplash && accountDestination == null && Build.VERSION.SDK_INT >= 33 && !notificationPrompts.getBoolean("notification_requested", false)) {
@@ -77,6 +85,11 @@ class MainActivity : ComponentActivity() {
                     pendingIntent = null
                     val number = request.data?.schemeSpecificPart?.substringBefore('?')
                     if (number?.contains(',') == true || number?.contains(';') == true) model.reportError("Group messaging is not supported in this SMS-only build.")
+                    else if (request.action == WatchNotifications.REVIEW) {
+                        // Do not append the same notification payload again after Activity recreation.
+                        setIntent(Intent(this@MainActivity, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
+                        model.openWatchDraft(request.getStringExtra("thread_id"), request.getStringExtra("sms_body"))
+                    }
                     else model.openExternal(number, request.getStringExtra("sms_body"), request.getStringExtra("thread_id"))
                 }
             }

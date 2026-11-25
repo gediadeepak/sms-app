@@ -75,7 +75,7 @@ internal fun LinePicker(selected: Int?, subscriptions: List<DeviceSim>, preferen
 }
 
 @Composable
-internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onTestNotifications: () -> Unit, onAppSettings: () -> Unit, aiAccess: AiAccessState, onAiCheck: () -> Unit, onContacts: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onBlockedSenders: () -> Unit, onHeadset: () -> Unit, onDismiss: () -> Unit) {
+internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, onNotifications: () -> Unit, onTestNotifications: () -> Unit, onAppSettings: () -> Unit, aiAccess: AiAccessState, onAiCheck: () -> Unit, onContacts: () -> Unit, onAccount: () -> Unit, onBackup: () -> Unit, onBlockedSenders: () -> Unit, onHeadset: () -> Unit, onWatch: () -> Unit, onDismiss: () -> Unit) {
     val preferences = state.preferences
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
     var personal by rememberSaveable(preferences.personalLabel) { mutableStateOf(preferences.personalLabel) }
@@ -132,6 +132,9 @@ internal fun SettingsScreen(state: InboxState, onSave: (Preferences) -> Unit, on
             }
             SettingsSection("Headset readout", "Sender announcements and manual reading", expanded == "headset", { toggle("headset") }) {
                 OutlinedButton(onClick = onHeadset, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Headphones, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Headset readout") }
+            }
+            SettingsSection("Smartwatch", "Sony SmartWatch 3 · notification support", expanded == "watch", { toggle("watch") }) {
+                OutlinedButton(onClick = onWatch, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Watch, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Smartwatch settings") }
             }
             SettingsSection("About Sandesh", "SMS support and storage", expanded == "about", { toggle("about") }) {
                 Text("SMS only · MMS/RCS not supported. App flags and send receipts use a private SQLite database. SMS stays in Android’s system store; encrypted backups are available under Backup & restore.", fontSize = 12.sp, lineHeight = 21.sp, color = Muted)

@@ -63,10 +63,20 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
     var aiStartTask by rememberSaveable { mutableStateOf(AiTask.REPLIES) }
     var blockedSenders by rememberSaveable { mutableStateOf(false) }
     var headsetSettings by rememberSaveable { mutableStateOf(false) }
+    var watchSettings by rememberSaveable { mutableStateOf(false) }
     var spamAction by rememberSaveable { mutableStateOf<String?>(null) }
+    var handledWatchReview by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.watchReviewRequest) {
+        if (state.watchReviewRequest != null && handledWatchReview != state.watchReviewRequest) {
+            handledWatchReview = state.watchReviewRequest
+            settings = false; watchSettings = false; headsetSettings = false; blockedSenders = false
+            newMessage = false; forwardedId = null; assistant = false; spamAction = null
+            drawer.close()
+        }
+    }
     LaunchedEffect(state.selected == null) { if (state.selected == null) spamAction = null }
-    LaunchedEffect(drawer.currentValue, drawer.targetValue, newMessage, settings, assistant, blockedSenders, headsetSettings, spamAction) {
-        model.setContentOverlayVisible(drawer.isOpen || drawer.targetValue == DrawerValue.Open || newMessage || settings || assistant || blockedSenders || headsetSettings || spamAction != null)
+    LaunchedEffect(drawer.currentValue, drawer.targetValue, newMessage, settings, assistant, blockedSenders, headsetSettings, watchSettings, spamAction) {
+        model.setContentOverlayVisible(drawer.isOpen || drawer.targetValue == DrawerValue.Open || newMessage || settings || assistant || blockedSenders || headsetSettings || watchSettings || spamAction != null)
     }
     if (state.error != null) AlertDialog(onDismissRequest = model::clearError, title = { Text("Sandesh needs attention") }, text = { Text(state.error.orEmpty()) }, confirmButton = { TextButton(onClick = model::clearError) { Text("OK") } })
     if (!state.ready) {
@@ -77,11 +87,12 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
         when {
             blockedSenders -> BlockedSendersScreen(state.blockedSenders, model::unblockSender) { blockedSenders = false }
             headsetSettings -> HeadsetSettingsScreen(state.notificationStatus, onNotifications) { headsetSettings = false }
+            watchSettings -> WatchSettingsScreen(state.notificationStatus, onNotifications) { watchSettings = false }
             else -> settingsStateHolder.SaveableStateProvider("settings") {
                 SettingsScreen(state, onSave = model::savePreferences, onNotifications = onNotifications,
                     onTestNotifications = onTestNotifications, onAppSettings = onAppSettings, aiAccess = aiAccess, onAiCheck = model::checkAiAccess, onContacts = onContacts,
                     onAccount = onAccount, onBackup = onBackup, onBlockedSenders = { blockedSenders = true },
-                    onHeadset = { headsetSettings = true }, onDismiss = { settings = false })
+                    onHeadset = { headsetSettings = true }, onWatch = { watchSettings = true }, onDismiss = { settings = false })
             }
         }
         return
