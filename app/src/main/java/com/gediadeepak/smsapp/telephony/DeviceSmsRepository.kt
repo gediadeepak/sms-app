@@ -13,45 +13,6 @@ class DeviceSmsRepository(private val context: Context) {
     private val resolver get() = context.contentResolver
     private val database = SandeshDatabase.get(context)
 
-    fun load(subscriptions: List<DeviceSim>): List<Conversation> {
-        check(SmsAccess.ready(context)) { "Make Sandesh your default SMS app and allow the required permissions." }
-        val meta = database.metadata()
-        val blockedSenders = database.blockedSenders()
-        val deliveries = database.allDeliveries()
-        val groups = linkedMapOf<String, MutableList<Message>>()
-        val addresses = mutableMapOf<String, String>()
-        val unread = mutableMapOf<String, Int>()
-        val columns = arrayOf("_id", "thread_id", "address", "body", "date", "type", "read", "sub_id", "status")
-        resolver.query(Telephony.Sms.CONTENT_URI, columns, "type<>?", arrayOf(Telephony.Sms.MESSAGE_TYPE_DRAFT.toString()), "date ASC, _id ASC")?.use { cursor ->
-            while (cursor.moveToNext()) {
-                val id = cursor.getString(0)
-                val thread = cursor.getString(1)
-                val address = cursor.getString(2) ?: continue
-                val type = cursor.getInt(5)
-                val subscriptionId = if (cursor.isNull(7)) null else cursor.getInt(7).takeIf { it >= 0 }
-                val line = subscriptions.firstOrNull { it.subscriptionId == subscriptionId }?.line ?: SimLine.UNKNOWN
-                val outgoing = type != Telephony.Sms.MESSAGE_TYPE_INBOX
-                val delivery = if (!outgoing) Delivery.RECEIVED else deliveries[id] ?: when {
-                    type == Telephony.Sms.MESSAGE_TYPE_FAILED -> Delivery.FAILED
-                    type == Telephony.Sms.MESSAGE_TYPE_OUTBOX || type == Telephony.Sms.MESSAGE_TYPE_QUEUED -> Delivery.SENDING
-                    !cursor.isNull(8) && cursor.getInt(8) == Telephony.Sms.STATUS_COMPLETE -> Delivery.DELIVERED
-                    !cursor.isNull(8) && cursor.getInt(8) >= Telephony.Sms.STATUS_FAILED -> Delivery.UNDELIVERED
-                    type == Telephony.Sms.MESSAGE_TYPE_SENT -> Delivery.SENT
-                    else -> Delivery.UNKNOWN
-                }
-                groups.getOrPut(thread) { mutableListOf() }.add(Message(id, cursor.getString(3).orEmpty(), outgoing, cursor.getLong(4), line, delivery, subscriptionId))
-                addresses[thread] = address
-                if (!outgoing && cursor.getInt(6) == 0) unread[thread] = (unread[thread] ?: 0) + 1
-            }
-        } ?: error("Android did not return an SMS inbox. Try allowing SMS access again.")
-        return groups.map { (thread, messages) ->
-            val metadata = meta[thread]
-            Conversation(thread, metadata?.alias?.takeIf { it.isNotBlank() } ?: addresses.getValue(thread), addresses.getValue(thread),
-                messages.last().line, messages, unread[thread] ?: 0, metadata?.starred ?: false, metadata?.archived ?: false,
-                subscriptionId = messages.last().subscriptionId, spam = metadata?.spam == true,
-                blocked = spamSenderKey(addresses.getValue(thread)) in blockedSenders)
-        }.sortedByDescending { it.messages.last().timestamp }
-    }
     fun threadId(number: String): String {
         check(SmsAccess.isDefault(context)) { "SMS access is not ready." }
         return Telephony.Threads.getOrCreateThreadId(context, number).toString()

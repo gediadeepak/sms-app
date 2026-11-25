@@ -1,4 +1,6 @@
-# Sandesh privacy notes (0.6.1)
+# Sandesh privacy notes (0.7.0)
+
+Normal inbox/history reads are now paged from Android's SMS provider into process memory. Older pages are requested by scrolling; closing a conversation releases its old loaded bodies. Search can scan older text inside the local provider and returns matching thread identities. No new SMS copy, remote service or permission is introduced by pagination. Manual encrypted backups still include the full eligible history, independently of loaded pages.
 
 This documents implemented behaviour. The owner must supply a hosted policy, support contact and retention/deletion terms before publication.
 

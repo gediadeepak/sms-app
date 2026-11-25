@@ -42,6 +42,7 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 - Optional Firebase AI Logic conversation summaries and reply drafts, with independent settings, a preview before sharing, sensitive-message heuristics and local request limits. Generated replies never send automatically; existing drafts are preserved. App Check uses the debug provider locally and Play Integrity in release. AI settings/results are excluded from backups; restore disables AI.
 
 - Message actions: long-press a bubble or tap its menu to **Copy**, **Forward** or **Share**. Paste respects the composer cursor/selection. Forwarding opens a recipient picker and prepares an editable draft; only the normal Send button transmits SMS.
+- **Lazy loading:** 50 conversation previews initially, then 50 more near the inbox end. Threads load the latest 50 messages and fetch older pages as you scroll up. Search includes unloaded older text. See [paging behaviour and device checks](docs/PAGING.md).
 - **Settings → Smartwatch** adds opt-in Sony SmartWatch 3 notification actions: Mark read and Draft reply for phone review. Sender/body previews are separately optional and also affect phone notifications. Includes a mirroring test alert. This is phone-side support, not a watch app; see [setup and required device tests](docs/SMARTWATCH.md).
 - **AI reply** drafts directly in the conversation composer from recent eligible history, with tone controls and alternatives. Existing text is preserved; typing during generation prevents automatic insertion. Summaries and full text previews remain available.
 
@@ -64,7 +65,7 @@ No seeded conversations are loaded by the Android app. Version 0.3.0 switches to
 - Cloud AI requires owner-side Firebase AI Logic, App Check and billing/quota setup. It is opt-in, may be inaccurate and processes the selected text with Google. Filtering is heuristic, not a privacy guarantee. Draft tidying remains on-device text rules.
 - Unknown/removed historical subscriptions show **Unknown SIM** rather than an invented line.
 - Telecom's “respond via message” service posts a review notification and opens a draft; it does not send silently. Notifications must be enabled for this flow.
-- The current inbox loads SMS history on a background thread; very large inbox performance needs device testing and future paging.
+- Inbox and history use provider-backed pages. Large-inbox performance and vendor SMS-provider query compatibility still need physical-device testing. The header reports loaded conversations, not a global total.
 
 See the [physical-device test plan](docs/DEVICE_TEST_PLAN.md), [privacy notes](docs/PRIVACY.md), and [branding and asset prompt](docs/BRANDING.md).
 

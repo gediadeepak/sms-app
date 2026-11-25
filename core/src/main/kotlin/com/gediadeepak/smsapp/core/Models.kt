@@ -34,6 +34,8 @@ data class Conversation(
     val spam: Boolean = false,
     val blocked: Boolean = false,
     val contactName: String? = null,
+    val historyReady: Boolean = true,
+    val hasOlderMessages: Boolean = false,
 ) {
     val displayName get() = contactName ?: name
     val initials: String get() = displayName.trim().split(Regex("\\s+")).take(2).mapNotNull { it.firstOrNull() }.joinToString("").uppercase()

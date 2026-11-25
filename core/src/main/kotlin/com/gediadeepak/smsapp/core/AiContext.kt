@@ -44,6 +44,6 @@ object AiContextPolicy {
             AiMessage(message.id, message.outgoing, text)
         }.asReversed()
         return AiContext(messages, window.count { it.text.isNotBlank() && sensitive(it.text) },
-            shortened || messages.size < eligible.size || window.size < conversation.messages.size)
+            shortened || messages.size < eligible.size || window.size < conversation.messages.size || conversation.hasOlderMessages)
     }
 }

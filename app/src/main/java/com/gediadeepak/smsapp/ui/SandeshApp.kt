@@ -10,6 +10,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -154,7 +155,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))) {
                     if (wide || state.selectedId == null) {
                         Inbox(state, Modifier.then(if (wide) Modifier.width(330.dp) else Modifier.weight(1f)), model::select,
-                            model::search, model::filter, startMessage, compact = !wide, onNotifications = onNotifications, onContacts = onContacts)
+                            model::search, model::filter, startMessage, compact = !wide, onNotifications = onNotifications, onContacts = onContacts, onLoadMore = model::loadMoreInbox)
                     }
                     if (wide) VerticalDivider()
                     if (wide || state.selectedId != null) {
@@ -202,8 +203,8 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
                 .clickable { onFolder(folder) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(vector, null, tint = if (selected) Forest else Muted, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(12.dp))
                 Text(folder.label, fontSize = 14.sp, color = if (selected) Forest else Muted, modifier = Modifier.weight(1f))
-                if (folder == Folder.UNREAD && state.unreadCount > 0) Badge(containerColor = Forest) { Text(state.unreadCount.toString()) }
-                if (folder == Folder.SPAM) state.conversations.count { it.spam || it.blocked }.takeIf { it > 0 }?.let { Text(it.toString(), fontSize = 12.sp, color = Muted) }
+                if (state.inboxIds == null && folder == Folder.UNREAD && state.unreadCount > 0) Badge(containerColor = Forest) { Text(state.unreadCount.toString()) }
+                if (state.inboxIds == null && folder == Folder.SPAM) state.conversations.count { it.spam || it.blocked }.takeIf { it > 0 }?.let { Text(it.toString(), fontSize = 12.sp, color = Muted) }
             }
         }
         Text("YOUR LINES", fontSize = 11.sp, color = Muted, letterSpacing = 1.sp, modifier = Modifier.padding(top = 30.dp, bottom = 14.dp))
@@ -228,7 +229,12 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
 }
 
 @Composable
-private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> Unit, onSearch: (String) -> Unit, onFilter: (SimLine?) -> Unit, onNew: () -> Unit, compact: Boolean = true, onNotifications: () -> Unit = {}, onContacts: () -> Unit = {}) {
+private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> Unit, onSearch: (String) -> Unit, onFilter: (SimLine?) -> Unit, onNew: () -> Unit, compact: Boolean = true, onNotifications: () -> Unit = {}, onContacts: () -> Unit = {}, onLoadMore: () -> Unit = {}) {
+    val list = key(state.folder, state.filterLine, state.query) { rememberLazyListState() }
+    val atEnd by remember(list) { derivedStateOf { val info = list.layoutInfo; info.totalItemsCount > 0 && (info.visibleItemsInfo.maxOfOrNull { it.index } ?: -1) >= info.totalItemsCount - 6 } }
+    LaunchedEffect(atEnd, state.inboxNext, state.loading, state.loadingMore, state.inboxPageError) {
+        if (atEnd && state.inboxNext != null && !state.loading && !state.loadingMore && state.inboxPageError == null) onLoadMore()
+    }
     Column(modifier.fillMaxHeight()) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 16.dp, end = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -245,7 +251,7 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
             LineFilter("All lines", state.filterLine == null) { onFilter(null) }
             state.subscriptions.map { it.line }.distinct().forEach { line -> LineFilter(state.preferences.label(line), state.filterLine == line, line) { onFilter(line) } }
         }
-        Row(Modifier.padding(horizontal = 22.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("CONVERSATIONS", color = Muted, fontSize = 10.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f)); Text(state.visible.size.toString().padStart(2, '0'), color = Muted, fontSize = 11.sp) }
+        Row(Modifier.padding(horizontal = 22.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text("CONVERSATIONS", color = Muted, fontSize = 10.sp, letterSpacing = 1.sp, modifier = Modifier.weight(1f)); Text("${state.visible.size}${if (state.inboxNext != null) "+" else ""} loaded", color = Muted, fontSize = 11.sp) }
         if (state.notificationStatus != SmsNotificationStatus.ENABLED) {
             Row(Modifier.fillMaxWidth().background(Sage).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.NotificationsOff, null, Modifier.size(18.dp), tint = Forest)
@@ -256,8 +262,8 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
         if (!state.contactsGranted) TextButton(onClick = onContacts, modifier = Modifier.fillMaxWidth()) { Text("Show contact names", fontSize = 12.sp) }
         if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (state.pendingMms > 0) Text("MMS received: attachments are unavailable. See Settings.", color = MaterialTheme.colorScheme.error, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
-        if (state.visible.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(if (state.query.isNotBlank()) "No matching conversations." else "A little space for new conversations.", Modifier.padding(24.dp), color = Muted, fontSize = 14.sp) }
-        else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 9.dp)) {
+        if (state.visible.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(if (state.loading) "Loading conversations…" else if (state.query.isNotBlank()) "No matching conversations." else "A little space for new conversations.", Modifier.padding(24.dp), color = Muted, fontSize = 14.sp) }
+        else LazyColumn(state = list, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 9.dp)) {
             items(state.visible, key = { it.id }) { c ->
                 val last = c.messages.lastOrNull()
                 Row(Modifier.fillMaxWidth().background(if (c.id == state.selectedId) Sage else Color.Transparent, RoundedCornerShape(10.dp))
@@ -277,6 +283,12 @@ private fun Inbox(state: InboxState, modifier: Modifier, onSelect: (String) -> U
                             else if (c.starred) { Spacer(Modifier.width(8.dp)); Icon(Icons.Outlined.Star, "Starred", Modifier.size(13.dp), tint = Work) }
                         }
                     }
+                }
+            }
+            if (state.loadingMore || state.inboxPageError != null || state.inboxNext != null) item(key = "inbox-page") {
+                Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.Center) {
+                    if (state.loadingMore) CircularProgressIndicator(Modifier.size(24.dp))
+                    else TextButton(onClick = onLoadMore) { Text(if (state.inboxPageError != null) "Retry loading conversations" else "Load 50 more") }
                 }
             }
         }
@@ -330,9 +342,13 @@ private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewMode
         Box(modifier.fillMaxHeight(), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(30.dp)) { Icon(Icons.Outlined.Forum, null, Modifier.size(48.dp), tint = Forest); Text("Make a little connection.", fontSize = 22.sp, modifier = Modifier.padding(top = 20.dp)); Text("Choose a conversation to get started.", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 10.dp)) } }
         return
     }
-    val scroll = rememberLazyListState()
+    val scroll = key(c.id) { rememberLazyListState() }
+    val oldestVisible by remember(scroll) { derivedStateOf { val info = scroll.layoutInfo; info.totalItemsCount > 0 && (info.visibleItemsInfo.maxOfOrNull { it.index } ?: -1) >= info.totalItemsCount - 6 } }
+    LaunchedEffect(oldestVisible, c.id, c.hasOlderMessages, c.messages.size, state.historyLoading, state.historyPageError) {
+        if (oldestVisible && c.historyReady && c.hasOlderMessages && !state.historyLoading && state.historyPageError == null) model.loadMoreMessages()
+    }
     val readAvailable = !c.spam && !c.blocked && HeadsetReadout.selected(LocalContext.current) != null && state.notificationStatus == SmsNotificationStatus.ENABLED
-    LaunchedEffect(c.id, c.messages.size) { if (c.messages.isNotEmpty()) scroll.scrollToItem(c.messages.lastIndex) }
+    LaunchedEffect(c.id, c.messages.lastOrNull()?.id) { if (scroll.firstVisibleItemIndex < 3) scroll.scrollToItem(0) }
     Column(modifier.fillMaxHeight()) {
         if (showHeader) ConversationHeader(c, null, model::star, model::archive, if (state.preferences.aiEnabled && (state.preferences.aiReplies || state.preferences.aiSummaries) && !c.spam && !c.blocked) ({ onAssistant(if (state.preferences.aiReplies) AiTask.REPLIES else AiTask.SUMMARY) }) else null, onSpamAction)
         if (c.spam || c.blocked) Row(Modifier.fillMaxWidth().background(Sage).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -343,12 +359,12 @@ private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewMode
         Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.SimCard, null, Modifier.size(14.dp), tint = Muted); Spacer(Modifier.width(7.dp)); Text("Conversation on", color = Muted, fontSize = 11.sp); Spacer(Modifier.width(8.dp)); LineBadge(c.line, state.preferences)
         }
-        LazyColumn(state = scroll, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(19.dp)) {
-            if (c.messages.isEmpty()) item { Text("A new conversation, a fresh start.\nWrite your first message below.", fontSize = 14.sp, color = Muted, modifier = Modifier.padding(20.dp)) }
-            items(c.messages, key = { it.id }) { m ->
-                val index = c.messages.indexOfFirst { it.id == m.id }
+        LazyColumn(state = scroll, reverseLayout = true, modifier = Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(19.dp)) {
+            if (c.messages.isEmpty() && c.historyReady) item { Text("A new conversation, a fresh start.\nWrite your first message below.", fontSize = 14.sp, color = Muted, modifier = Modifier.padding(20.dp)) }
+            val newestFirst = c.messages.asReversed()
+            itemsIndexed(newestFirst, key = { _, m -> m.id }) { index, m ->
                 val date = day(m.timestamp)
-                if (index == 0 || day(c.messages[index - 1].timestamp) != date) {
+                if (index == newestFirst.lastIndex || day(newestFirst[index + 1].timestamp) != date) {
                     Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
                         Text(date, fontSize = 11.sp, color = Muted, modifier = Modifier.padding(horizontal = 15.dp))
@@ -356,6 +372,12 @@ private fun Thread(state: InboxState, modifier: Modifier, model: SandeshViewMode
                     }
                 }
                 MessageBubble(m, state.preferences, if (readAvailable && !m.outgoing) ({ onReadMessage(m.id) }) else null, { onForward(m.id) })
+            }
+            if (state.historyLoading || state.historyPageError != null || c.hasOlderMessages) item(key = "history-page") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    if (state.historyLoading) CircularProgressIndicator(Modifier.size(24.dp))
+                    else TextButton(onClick = model::loadMoreMessages) { Text(if (state.historyPageError != null) "Retry loading messages" else "Load 50 older messages") }
+                }
             }
         }
         if (!c.spam && !c.blocked) ConversationComposer(state, model, onAssistant)

@@ -56,7 +56,7 @@ internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, on
                     if (answer.loading) TextButton(onClick = model::cancelAi) { Text("Cancel") }
                     else FilledTonalButton(onClick = {
                         model.generateAi(AiTask.REPLIES, tone, AiContextPolicy.prepare(conversation).fingerprint, insertIntoDraft = true)
-                    }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) { Text("AI reply", fontSize = 12.sp) }
+                    }, enabled = conversation.historyReady && !state.historyLoading, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) { Text("AI reply", fontSize = 12.sp) }
                 }
             }
             Text("AI shares recent eligible chat text with Google when requested. Preview first; charges may apply.", fontSize = 10.sp, color = Muted, lineHeight = 15.sp)

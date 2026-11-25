@@ -57,7 +57,7 @@ internal fun AiScreen(state: InboxState, model: SandeshViewModel, initialTask: A
                     Text("Generating…", color = Muted)
                     TextButton(onClick = model::cancelAi) { Text("Cancel waiting") }
                 } else {
-                    Button(onClick = { input?.let { model.generateAi(task, tone, it.fingerprint) } }, enabled = !input?.messages.isNullOrEmpty(), modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = { input?.let { model.generateAi(task, tone, it.fingerprint) } }, enabled = conversation?.historyReady == true && !state.historyLoading && !input?.messages.isNullOrEmpty(), modifier = Modifier.fillMaxWidth()) {
                         Text(if (task == AiTask.SUMMARY) "Share text & summarize" else "Share text & suggest replies")
                     }
                 }

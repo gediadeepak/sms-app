@@ -105,6 +105,8 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 
 ## Message actions, contacts and inline AI (0.6.0)
 
+For 0.7.0 also complete the cold-launch, 50-row paging, scroll-anchor, old-text search, cancellation, unloaded notification target and complete backup/restore checks in [PAGING.md](PAGING.md).
+
 For the later 0.6.1 smartwatch integration, also complete the pairing, delayed Mark read, draft handoff, privacy and disconnection checks in [SMARTWATCH.md](SMARTWATCH.md). The watch must be paired before device compatibility can be claimed.
 
 - Contacts permission is optional: test allow, deny, permanent denial/settings, revoke and regrant without losing SMS access. Names refresh after editing/deleting a contact and disappear after revocation. No contact data is copied into backups or AI metadata.

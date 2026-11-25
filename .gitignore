@@ -19,3 +19,4 @@ dependency-validation.log
 settings-validation.log
 appcheck-debug.local.properties
 watch-validation.log
+paging-validation.log
