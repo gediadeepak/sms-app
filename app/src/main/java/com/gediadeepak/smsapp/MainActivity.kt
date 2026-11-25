@@ -85,6 +85,10 @@ class MainActivity : ComponentActivity() {
                     pendingIntent = null
                     val number = request.data?.schemeSpecificPart?.substringBefore('?')
                     if (number?.contains(',') == true || number?.contains(';') == true) model.reportError("Group messaging is not supported in this SMS-only build.")
+                    else if (request.action == WatchNotifications.OPEN) {
+                        setIntent(Intent(this@MainActivity, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
+                        model.openWatchConversation(request.getStringExtra("thread_id"))
+                    }
                     else if (request.action == WatchNotifications.REVIEW) {
                         // Do not append the same notification payload again after Activity recreation.
                         setIntent(Intent(this@MainActivity, MainActivity::class.java).setAction(Intent.ACTION_MAIN))

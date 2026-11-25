@@ -97,6 +97,9 @@ object SmsNotifications {
 
     fun watchTest(context: Context) = post(context, -105, "Sandesh watch test", "If this alert appears on your watch, notification mirroring is working. No SMS was sent.",
         Intent(context, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
+    fun watchOpen(context: Context, thread: String) = post(context, thread.hashCode(), "Open your watch conversation", "Tap to open this conversation in Sandesh. Nothing was sent.",
+        Intent(context, MainActivity::class.java).setAction(WatchNotifications.OPEN).setData(Uri.parse("sandesh://watch-open/$thread")).putExtra("thread_id", thread),
+        tag = "sandesh.watch-open.$thread", localOnly = true)
     fun readoutForeground(context: Context, body: Boolean, testing: Boolean): Notification {
         val stop = PendingIntent.getBroadcast(context, -104, Intent(context, ReadSmsActionReceiver::class.java).setAction(HeadsetReadout.STOP), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val open = PendingIntent.getActivity(context, -104, Intent(context, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

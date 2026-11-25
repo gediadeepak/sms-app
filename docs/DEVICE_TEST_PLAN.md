@@ -105,6 +105,8 @@ Use test recipients you control. Sending real SMS can incur carrier charges. Nev
 
 ## Message actions, contacts and inline AI (0.6.0)
 
+For the native 0.8.0 Sony watch inbox, also complete [WATCH_APP.md](WATCH_APP.md): matching APK identities, launcher, disabled-setting handshake, bounded inbox/thread preview requests, opt-out/expiry, theme changes, Open on phone and disconnect recovery.
+
 For 0.7.0 also complete the cold-launch, 50-row paging, scroll-anchor, old-text search, cancellation, unloaded notification target and complete backup/restore checks in [PAGING.md](PAGING.md).
 
 For the later 0.6.1 smartwatch integration, also complete the pairing, delayed Mark read, draft handoff, privacy and disconnection checks in [SMARTWATCH.md](SMARTWATCH.md). The watch must be paired before device compatibility can be claimed.

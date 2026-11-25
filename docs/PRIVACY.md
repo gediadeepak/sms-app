@@ -1,4 +1,6 @@
-# Sandesh privacy notes (0.7.0)
+# Sandesh privacy notes (0.8.0)
+
+The optional native Sandesh watch app has its own phone-side Enable watch inbox opt-in. It can request ten recent non-Spam/non-blocked inbox previews and five recent messages from a chosen conversation. Names, body previews and dates travel through Google Play services' authenticated app-to-app Message API, which may use Bluetooth or Google's relay network. No account is required for this feature. It is separate from Gemini and notification preview settings. The watch has no SMS/Contacts permissions and keeps responses only in foreground memory, clearing them on pause/exit and after one minute. There is no offline database, DataItem sync or backup of watch content. Turning the setting off denies further responses and attempts to clear a connected watch. A disconnected watch may retain the current preview until local expiry. Diagnostic logs contain command/status only, not bodies or sender details. Open on phone posts a generic phone-only notification and never sends an SMS.
 
 Normal inbox/history reads are now paged from Android's SMS provider into process memory. Older pages are requested by scrolling; closing a conversation releases its old loaded bodies. Search can scan older text inside the local provider and returns matching thread identities. No new SMS copy, remote service or permission is introduced by pagination. Manual encrypted backups still include the full eligible history, independently of loaded pages.
 

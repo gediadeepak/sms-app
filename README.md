@@ -43,7 +43,8 @@ Release signing uses environment variables; see [release preparation](docs/RELEA
 
 - Message actions: long-press a bubble or tap its menu to **Copy**, **Forward** or **Share**. Paste respects the composer cursor/selection. Forwarding opens a recipient picker and prepares an editable draft; only the normal Send button transmits SMS.
 - **Lazy loading:** 50 conversation previews initially, then 50 more near the inbox end. Threads load the latest 50 messages and fetch older pages as you scroll up. Search includes unloaded older text. See [paging behaviour and device checks](docs/PAGING.md).
-- **Settings → Smartwatch** adds opt-in Sony SmartWatch 3 notification actions: Mark read and Draft reply for phone review. Sender/body previews are separately optional and also affect phone notifications. Includes a mirroring test alert. This is phone-side support, not a watch app; see [setup and required device tests](docs/SMARTWATCH.md).
+- **Settings → Smartwatch** adds opt-in Sony SmartWatch 3 notification actions: Mark read and Draft reply for phone review. Sender/body previews are separately optional and also affect phone notifications. Includes a mirroring test alert. These actions work without installing the separate watch app; see [notification setup and tests](docs/SMARTWATCH.md).
+- The separate **Sandesh mini watch inbox** (`wear` module) adds a launcher icon, ten recent conversations, five-message previews, Refresh and Open on phone on Sony SmartWatch 3 / API 23. It needs the matching phone app and a separate watch-inbox opt-in. See [watch APK setup](docs/WATCH_APP.md).
 - **AI reply** drafts directly in the conversation composer from recent eligible history, with tone controls and alternatives. Existing text is preserved; typing during generation prevents automatic insertion. Summaries and full text previews remain available.
 
 ## First launch

@@ -2,13 +2,13 @@ package com.gediadeepak.smsapp.telephony
 
 import android.content.Context
 
-data class WatchOptions(val actions: Boolean = false, val previews: Boolean = false)
+data class WatchOptions(val actions: Boolean = false, val previews: Boolean = false, val inbox: Boolean = false)
 
 /** Device-specific opt-ins, deliberately outside the SMS backup format. */
 class WatchSettings(context: Context) {
     private val storage = context.getSharedPreferences("sandesh_watch", Context.MODE_PRIVATE)
-    fun load() = WatchOptions(storage.getBoolean("actions", false), storage.getBoolean("previews", false))
+    fun load() = WatchOptions(storage.getBoolean("actions", false), storage.getBoolean("previews", false), storage.getBoolean("inbox", false))
     fun save(options: WatchOptions) {
-        storage.edit().putBoolean("actions", options.actions).putBoolean("previews", options.previews).apply()
+        storage.edit().putBoolean("actions", options.actions).putBoolean("previews", options.previews).putBoolean("inbox", options.inbox).apply()
     }
 }

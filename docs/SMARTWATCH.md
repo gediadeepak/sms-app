@@ -1,6 +1,6 @@
-# Sony SmartWatch 3 testing (0.6.1)
+# Sony SmartWatch 3 notification testing
 
-This is phone-side Android Wear 1.5 notification support, not a standalone watch app, inbox, tile or watch APK. No Bluetooth, microphone or notification-listener permission is added to Sandesh. Pairing and notification access are managed by the Android Wear / Wear OS companion app. Legacy companion availability, pairing, mirroring and voice entry need testing on the actual phone/watch combination.
+The following steps describe phone-side Android Wear 1.5 notification support introduced in 0.6.1. For the separate native launcher inbox added in 0.8.0, see [WATCH_APP.md](WATCH_APP.md). No Bluetooth, microphone or notification-listener permission is added to Sandesh. Pairing and notification access are managed by the Android Wear / Wear OS companion app. Legacy companion availability, pairing, mirroring and voice entry need testing on the actual phone/watch combination.
 
 ## Pair and enable
 

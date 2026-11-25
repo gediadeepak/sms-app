@@ -469,6 +469,17 @@ class SandeshViewModel(application: Application) : AndroidViewModel(application)
             mutableState.update { it.copy(folder = Folder.INBOX, query = "", filterLine = null, watchReviewRequest = java.util.UUID.randomUUID().toString()) }
         }
     }
+    fun openWatchConversation(threadId: String?) {
+        viewModelScope.launch {
+            refreshJob?.join()
+            try {
+                if (threadId == null || !ensureThread(threadId)) { reportError("This watch conversation is unavailable."); return@launch }
+                select(threadId)
+                mutableState.update { it.copy(watchReviewRequest = java.util.UUID.randomUUID().toString()) }
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { reportError("Could not open the watch conversation. Nothing was sent.") }
+        }
+    }
     fun openExternal(number: String?, body: String?, threadId: String?) {
         viewModelScope.launch {
             refreshJob?.join(); if (!state.value.ready) return@launch

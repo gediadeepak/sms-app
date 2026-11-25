@@ -20,6 +20,7 @@ object WatchNotifications {
     const val REPLY = "com.sandesh.app.WATCH_DRAFT"
     const val READ = "com.sandesh.app.WATCH_READ"
     const val REVIEW = "com.sandesh.app.REVIEW_WATCH_DRAFT"
+    const val OPEN = "com.sandesh.app.OPEN_WATCH_THREAD"
     const val INPUT = "watch_reply"
 
     internal fun message(context: Context, thread: String, id: String): WatchMessage? {

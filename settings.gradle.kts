@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Sandesh"
-include(":app", ":core")
+include(":app", ":core", ":watch-protocol", ":wear")

@@ -12,8 +12,8 @@ android {
         applicationId = "com.sandesh.app"
         minSdk = 24
         targetSdk = 37
-        versionCode = 13
-        versionName = "0.7.0"
+        versionCode = 14
+        versionName = "0.8.0"
     }
     buildFeatures { compose = true }
     compileOptions {
@@ -41,6 +41,8 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":watch-protocol"))
+    implementation("com.google.android.gms:play-services-wearable:20.0.1")
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
