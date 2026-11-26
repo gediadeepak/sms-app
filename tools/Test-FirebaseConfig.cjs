@@ -1,0 +1,10 @@
+const assert = require('node:assert/strict');
+const {validate} = require('./Validate-FirebaseConfig.cjs');
+const config = () => ({project_info: {project_id: 'fixture'}, client: [{client_info: {mobilesdk_app_id: 'fixture', android_client_info: {package_name: 'example.app'}}, api_key: [{current_key: 'fixture'}], oauth_client: [{client_type: 3, client_id: 'fixture'}]}]});
+assert.doesNotThrow(() => validate(config(), 'example.app'));
+assert.throws(() => validate(config(), 'other.app'), /no Android client/);
+let c = config(); c.client[0].oauth_client = []; assert.throws(() => validate(c, 'example.app'), /OAuth client/);
+c = config(); c.client[0].api_key = []; assert.throws(() => validate(c, 'example.app'), /API key/);
+c = config(); delete c.project_info; assert.throws(() => validate(c, 'example.app'), /project_id/);
+c = config(); c.client.unshift({client_info: {android_client_info: {package_name: 'other.app'}}}); assert.doesNotThrow(() => validate(c, 'example.app'));
+console.log('Passed 6 Firebase configuration checks using isolated fixtures.');
