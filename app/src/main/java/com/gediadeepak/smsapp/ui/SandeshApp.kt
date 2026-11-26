@@ -122,13 +122,14 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
       BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 840.dp
         val desktop = maxWidth >= 1250.dp
+        val drawerWidth = minOf(320.dp, maxWidth * 0.9f)
         LaunchedEffect(wide) { if (wide && state.selected == null) state.visible.firstOrNull()?.let { model.select(it.id) } }
         val openSettings = { settings = true; scope.launch { drawer.close() }; Unit }
         val startMessage = { forwardedId = null; newMessage = true; scope.launch { drawer.close() }; Unit }
         BackHandler(enabled = state.selectedId != null && !drawer.isOpen && !newMessage && !settings && !assistant && !blockedSenders && !headsetSettings && spamAction == null) { model.back() }
         val navigation: @Composable () -> Unit = {
             Sidebar(state, onFolder = { model.folder(it); scope.launch { drawer.close() } },
-                onLine = { model.filter(it); scope.launch { drawer.close() } }, onNew = startMessage, onSettings = openSettings, onQueue = { outbox=true; scope.launch { drawer.close() } })
+                onLine = { model.filter(it); scope.launch { drawer.close() } }, onNew = startMessage, onSettings = openSettings, onQueue = { outbox=true; scope.launch { drawer.close() } }, modifier = Modifier.width(drawerWidth))
         }
         val workspace: @Composable () -> Unit = {
             Scaffold(
@@ -174,7 +175,7 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
         if (desktop) {
             Row(Modifier.fillMaxSize().background(Canvas)) { navigation(); Box(Modifier.weight(1f)) { workspace() } }
         } else {
-            ModalNavigationDrawer(drawerState = drawer, drawerContent = { ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow) { navigation() } }) { workspace() }
+            ModalNavigationDrawer(drawerState = drawer, drawerContent = { ModalDrawerSheet(modifier = Modifier.width(drawerWidth), drawerContainerColor = MaterialTheme.colorScheme.surfaceContainer) { navigation() } }) { workspace() }
         }
     }
     }
@@ -192,9 +193,20 @@ fun SandeshApp(model: SandeshViewModel, onSetup: () -> Unit = {}, onAppSettings:
 }
 
 @Composable
-private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimLine?) -> Unit, onNew: () -> Unit, onSettings: () -> Unit, onQueue: () -> Unit) {
-    Column(Modifier.width(235.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainerLow).statusBarsPadding().navigationBarsPadding()
-        .padding(20.dp).verticalScroll(rememberScrollState())) {
+private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimLine?) -> Unit, onNew: () -> Unit, onSettings: () -> Unit, onQueue: () -> Unit, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val versionLabel = remember(context) {
+        runCatching {
+            @Suppress("DEPRECATION")
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            @Suppress("DEPRECATION")
+            val code = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+            "Version ${info.versionName ?: "unknown"} ($code)"
+        }.getOrDefault("Version unavailable")
+    }
+    Column(modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surfaceContainer).statusBarsPadding().navigationBarsPadding()
+        .imePadding().padding(20.dp)) {
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 12.dp)) {
             SandeshLogo(Modifier.size(42.dp))
             Spacer(Modifier.width(10.dp)); Text("sandesh.", fontSize = 29.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
@@ -213,7 +225,8 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
                 if (state.inboxIds == null && folder == Folder.SPAM) state.conversations.count { it.spam || it.blocked }.takeIf { it > 0 }?.let { Text(it.toString(), fontSize = 12.sp, color = Muted) }
             }
         }
-        Text("YOUR LINES", fontSize = 11.sp, color = Muted, letterSpacing = 1.sp, modifier = Modifier.padding(top = 30.dp, bottom = 14.dp))
+        HorizontalDivider(Modifier.padding(top = 16.dp, bottom = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Text("YOUR LINES", fontSize = 11.sp, color = Muted, letterSpacing = 1.sp, modifier = Modifier.padding(bottom = 14.dp))
         state.subscriptions.forEach { sim ->
             val line = sim.line
             Surface(onClick = { onLine(line) }, shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surface,
@@ -226,12 +239,15 @@ private fun Sidebar(state: InboxState, onFolder: (Folder) -> Unit, onLine: (SimL
         }
         if (state.subscriptions.isEmpty()) Text("No active SIM detected", fontSize = 13.sp, color = Muted)
         TextButton(onClick = { onLine(null) }) { Text("Show both lines", fontSize = 12.sp, color = Muted) }
-        Spacer(Modifier.height(30.dp))
+        HorizontalDivider(Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
         Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Lock, null, Modifier.size(15.dp), tint = Muted); Spacer(Modifier.width(8.dp)); Text("Your conversations stay\non this device.", color = Muted, fontSize = 11.sp) }
         TextButton(onClick = onQueue) { Icon(Icons.Outlined.Schedule,null); Spacer(Modifier.width(10.dp)); Text("Scheduled & Undo") }
         TextButton(onClick = onSettings, modifier = Modifier.padding(top = 16.dp)) { Icon(Icons.Outlined.Settings, null, Modifier.size(18.dp)); Spacer(Modifier.width(10.dp)); Text("Settings") }
-        HorizontalDivider(Modifier.padding(vertical = 12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Sms, null, tint = Forest); Spacer(Modifier.width(10.dp)); Column { Text("Sandesh", fontSize = 14.sp, fontWeight = FontWeight.Medium); Text("On-device SMS", fontSize = 11.sp, color = Muted) } }
+        }
+        HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.Sms, null, tint = Forest); Spacer(Modifier.width(10.dp)); Column { Text("Sandesh", fontSize = 14.sp, fontWeight = FontWeight.Medium); Text("On-device SMS", fontSize = 11.sp, color = Muted); Text(versionLabel, fontSize = 11.sp, color = Muted) } }
+        }
     }
 }
 

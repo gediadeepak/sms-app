@@ -21,6 +21,8 @@ private val Green = lightColorScheme(
     secondary = Color(0xFF956A37), secondaryContainer = Color(0xFFF7EEE1), onSecondaryContainer = Color(0xFF795128),
     background = Color(0xFFF5F7F3), onBackground = Color(0xFF26392E), surface = Color.White, onSurface = Color(0xFF26392E),
     surfaceVariant = Color(0xFFF0F3EC), onSurfaceVariant = Color(0xFF6E7E66), surfaceContainerLow = Color(0xFFFAFBF8),
+    surfaceContainerLowest = Color.White, surfaceContainer = Color(0xFFF0F4EC),
+    surfaceContainerHigh = Color(0xFFE8EFE2), surfaceContainerHighest = Color(0xFFE1E9D9), surfaceTint = Color(0xFF245C46),
     outline = Color(0xFF819078), outlineVariant = Color(0xFFE0E7D9),
 )
 private val Blue = lightColorScheme(
@@ -28,6 +30,8 @@ private val Blue = lightColorScheme(
     secondary = Color(0xFF526694), secondaryContainer = Color(0xFFEFF2FA), onSecondaryContainer = Color(0xFF384D78),
     background = Color(0xFFF5F7FC), onBackground = Color(0xFF202B42), surface = Color.White, onSurface = Color(0xFF202B42),
     surfaceVariant = Color(0xFFF0F3FA), onSurfaceVariant = Color(0xFF65728C), surfaceContainerLow = Color(0xFFFAFBFF),
+    surfaceContainerLowest = Color.White, surfaceContainer = Color(0xFFF0F3FA),
+    surfaceContainerHigh = Color(0xFFE9EEF8), surfaceContainerHighest = Color(0xFFE0E7F5), surfaceTint = Color(0xFF2856D8),
     outline = Color(0xFF7A8AB0), outlineVariant = Color(0xFFDFE5F1),
 )
 private val Purple = lightColorScheme(
@@ -68,8 +72,10 @@ private val Dark = darkColorScheme(
     primary = Color.White, onPrimary = Color.Black, primaryContainer = Color(0xFF303030), onPrimaryContainer = Color.White,
     secondary = Color(0xFFD3D3D3), secondaryContainer = Color(0xFF272727), onSecondaryContainer = Color(0xFFECECEC),
     background = Color.Black, onBackground = Color.White, surface = Color(0xFF101010), onSurface = Color(0xFFF5F5F5),
-    surfaceVariant = Color(0xFF232323), onSurfaceVariant = Color(0xFFBDBDBD), surfaceContainerLow = Color(0xFF080808),
-    outline = Color(0xFF8C8C8C), outlineVariant = Color(0xFF343434),
+    surfaceVariant = Color(0xFF262626), onSurfaceVariant = Color(0xFFCACACA),
+    surfaceContainerLowest = Color(0xFF080808), surfaceContainerLow = Color(0xFF181818),
+    surfaceContainer = Color(0xFF202020), surfaceContainerHigh = Color(0xFF2A2A2A), surfaceContainerHighest = Color(0xFF343434),
+    surfaceTint = Color.White, outline = Color(0xFF8C8C8C), outlineVariant = Color(0xFF4A4A4A),
     error = Color.White, onError = Color.Black, errorContainer = Color(0xFF303030), onErrorContainer = Color.White,
 )
 @Composable

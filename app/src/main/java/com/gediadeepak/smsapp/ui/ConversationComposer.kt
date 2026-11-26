@@ -1,6 +1,7 @@
 package com.gediadeepak.smsapp.ui
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,9 +40,11 @@ internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, on
     LaunchedEffect(state.draft, conversation.id) {
         if (field.text != state.draft) field = TextFieldValue(state.draft, TextRange(state.draft.length))
     }
-    Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 12.dp)) {
+    Column(Modifier.padding(horizontal = 10.dp).padding(bottom = 12.dp)) {
         if (state.preferences.aiEnabled && (state.preferences.aiReplies || state.preferences.aiSummaries)) {
-          Column(Modifier.heightIn(max = if (keyboardVisible) 96.dp else 220.dp).verticalScroll(rememberScrollState())) {
+          Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(10.dp),
+              border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = Modifier.fillMaxWidth()) {
+          Column(Modifier.heightIn(max = if (keyboardVisible) 96.dp else 220.dp).verticalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 6.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (state.preferences.aiSummaries) IconButton(onClick = { onAssistant(AiTask.SUMMARY) }) { Icon(Icons.Outlined.Summarize, "Summarize conversation", Modifier.size(20.dp), tint = Forest) }
                 if (state.preferences.aiReplies) Box {
@@ -70,15 +73,18 @@ internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, on
                 Text(if (answer.insertedDraft == state.draft) "AI draft added · review and edit before sending" else "Choose a suggestion to add to your draft", fontSize = 10.sp, color = Muted)
             }
           }
+          }
+          Spacer(Modifier.height(8.dp))
         }
-        Surface(shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), color = MaterialTheme.colorScheme.surface) {
-            Column(Modifier.padding(10.dp)) {
+        Surface(shape = RoundedCornerShape(12.dp), border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline), color = MaterialTheme.colorScheme.surface) {
+            Column {
                 OutlinedTextField(value = field, onValueChange = {
                     if (it.text.length <= ComposerRules.LIMIT) { field = it; model.draft(it.text); pasteError = null }
                     else pasteError = "The draft limit is 1,600 characters. Shorten the text before adding more."
-                }, placeholder = { Text("Write a message…", fontSize = 15.sp) }, modifier = Modifier.fillMaxWidth(), minLines = if (keyboardVisible) 1 else 2, maxLines = if (keyboardVisible) 3 else 4,
+                }, placeholder = { Text("Write a message…", fontSize = 15.sp) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), minLines = if (keyboardVisible) 1 else 2, maxLines = if (keyboardVisible) 3 else 4,
                     colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = Color.Transparent, focusedBorderColor = Color.Transparent), textStyle = MaterialTheme.typography.bodyLarge)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) { LinePicker(state.sendSubscriptionId, state.subscriptions, state.preferences, model::sendSubscription) }
                     IconButton(onClick = {
                         val text = runCatching { clipboardText(context) }.getOrNull()
@@ -92,7 +98,7 @@ internal fun ConversationComposer(state: InboxState, model: SandeshViewModel, on
                         }
                     }, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.ContentPaste, "Paste text at cursor", Modifier.size(18.dp), tint = Muted) }
                     IconButton(onClick = model::polishDraft, enabled = state.draft.isNotBlank(), modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.Spellcheck, "Tidy draft with local rules", Modifier.size(18.dp), tint = Muted) }
-                    IconButton(onClick=onSchedule,enabled=state.draft.isNotBlank() && state.canSend) { Icon(Icons.Outlined.Schedule,"Schedule SMS") }
+                    IconButton(onClick=onSchedule,enabled=state.draft.isNotBlank() && state.canSend,modifier=Modifier.size(36.dp)) { Icon(Icons.Outlined.Schedule,"Schedule SMS",Modifier.size(18.dp)) }
                     Button(onClick = { model.send() }, enabled = state.draft.isNotBlank() && state.canSend, shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)) {
                         Text("Send", fontSize = 14.sp); Spacer(Modifier.width(5.dp)); Icon(Icons.AutoMirrored.Outlined.Send, null, Modifier.size(16.dp))
                     }
